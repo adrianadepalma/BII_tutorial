@@ -1,27 +1,30 @@
----
-title: "Calculating the Biodiversity Intactness Index"
-author: "Adriana De Palma"
-date: '`r format(Sys.time(), "%d %B, %Y")`'
-output:
-  github_document:
-    toc: yes
-    toc_depth: 4
-  html_document:
-    collapsed: no
-    theme: readable
-    toc: yes
-    toc_depth: 4
-    toc_float: yes
----
+Calculating the Biodiversity Intactness Index
+================
+Adriana De Palma
+05 February, 2019
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+-   [Load some packages](#load-some-packages)
+-   [Prepare the biodiversity data](#prepare-the-biodiversity-data)
+-   [Calculate diversity indices](#calculate-diversity-indices)
+    -   [Total Abundance](#total-abundance)
+    -   [Compositional Similarity](#compositional-similarity)
+-   [Run the statistical analysis](#run-the-statistical-analysis)
+    -   [Total Abundance](#total-abundance-1)
+    -   [Compositional Similarity](#compositional-similarity-1)
+-   [Projecting the model](#projecting-the-model)
+    -   [Model predictions](#model-predictions)
+    -   [Gather land-use rasters](#gather-land-use-rasters)
+    -   [Spatial projections of BII](#spatial-projections-of-bii)
+-   [Extensions](#extensions)
+-   [Advantages](#advantages)
+-   [Limitations](#limitations)
 
-This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We'll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII. We'll be using just a subset of the data and a very simple model to start with. 
+This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We'll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII. We'll be using just a subset of the data and a very simple model to start with.
 
-# Load some packages
-```{r, message=FALSE, warning=FALSE}
+Load some packages
+==================
+
+``` r
 library(dplyr) # for easy data manipulation
 library(tidyr) # ditto
 library(magrittr) # for piping
@@ -31,16 +34,16 @@ library(raster) # for working with raster data
 library(geosphere) # calculating geographic distance between sites
 library(foreach) # running loops
 library(doParallel) # running loops in parallel
-
 ```
 
-# Prepare the biodiversity data
+Prepare the biodiversity data
+=============================
 
 You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a/>. If you're working in `R`, I would strongly suggest downloading `database.rds` (the database is very large, and the rds file is much quicker to load in than the csv file).
 
-Once you've downloaded the database, read it in. I'm going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for _any_ region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.
+Once you've downloaded the database, read it in. I'm going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for *any* region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.
 
-```{r}
+``` r
 # read in the data
 diversity <- readRDS("database.rds") %>%
   
@@ -49,15 +52,41 @@ diversity <- readRDS("database.rds") %>%
 ```
 
 Now let's explore the data a little.
-```{r}
+
+``` r
 table(diversity$Predominant_land_use, diversity$Use_intensity)
 ```
 
-There's lots of data for the Americas across all land-use and intensity classes. Since we're using a simplified model for illustration purposes, we're not going to look at _all_ the use intensities here. However, we will keep _minimally-used primary vegetation_ separate, as this is the closest we have to a _pristine_ baseline.
+    ##                                           
+    ##                                            Minimal use Light use
+    ##   Primary vegetation                            163302     73282
+    ##   Young secondary vegetation                     36731      9427
+    ##   Intermediate secondary vegetation              51349     12968
+    ##   Mature secondary vegetation                    39909      5936
+    ##   Secondary vegetation (indeterminate age)       44260     10349
+    ##   Plantation forest                               9046     18478
+    ##   Pasture                                        38321     93577
+    ##   Cropland                                       13184     37887
+    ##   Urban                                           7431      5547
+    ##   Cannot decide                                      0         0
+    ##                                           
+    ##                                            Intense use Cannot decide
+    ##   Primary vegetation                             22783         12828
+    ##   Young secondary vegetation                      3673          7467
+    ##   Intermediate secondary vegetation               1041          5135
+    ##   Mature secondary vegetation                      396          2814
+    ##   Secondary vegetation (indeterminate age)         373          5407
+    ##   Plantation forest                               9429          2985
+    ##   Pasture                                         2612         29274
+    ##   Cropland                                       18751         24188
+    ##   Urban                                           1772           332
+    ##   Cannot decide                                      0          3438
+
+There's lots of data for the Americas across all land-use and intensity classes. Since we're using a simplified model for illustration purposes, we're not going to look at *all* the use intensities here. However, we will keep *minimally-used primary vegetation* separate, as this is the closest we have to a *pristine* baseline.
 
 So let's collapse down the data. Note that I'm doing this purely to make the example simpler. In reality, we include multiple land use and intensity combinations, including the age of secondary vegetation when possible.
 
-```{r}
+``` r
 diversity <- diversity %>%
   # make a level of Primary minimal. Everything else gets the coarse land use
   mutate(
@@ -81,15 +110,17 @@ diversity <- diversity %>%
   )
 ```
 
-# Calculate diversity indices
+Calculate diversity indices
+===========================
 
 The Biodiversity Intactness Index is derived from combining two models: one of total abundance, and one of compositional similarity. We're going to calculate these diversity metrics now.
 
-## Total Abundance
+Total Abundance
+---------------
 
 Total abundance is simply the sum of all individuals sampled at each site.
 
-```{r}
+``` r
 abundance_data <- diversity %>%
   
   # pull out just the abundance measures
@@ -120,18 +151,18 @@ abundance_data <- diversity %>%
   mutate(RescaledAbundance = TotalAbundance/MaxAbundance)
 ```
 
+Compositional Similarity
+------------------------
 
-## Compositional Similarity
+We use the *asymmetric Jaccard Index* as our measure of compositional similarity. Essentially, we want to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site.
 
-We use the _asymmetric Jaccard Index_ as our measure of compositional similarity. Essentially, we want to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site.
+As an example, let's look at the following simple scenario. Our primary minimal site had 15 *Species A* individuals and 30 *Species B* individuals. A cropland site has 10 *Species A* and 40 *Species C* individuals. The compositional similarity measure that we use currently would say that only 10 out of a total 50 individuals in the cropland site were from *originally present species* (i.e. *Species A*): a value of 0.2.
 
-As an example, let's look at the following simple scenario. Our primary minimal site had 15 _Species A_ individuals and 30 _Species B_ individuals. A cropland site has 10 _Species A_ and 40 _Species C_ individuals. The compositional similarity measure that we use currently would say that only 10 out of a total 50 individuals in the cropland site were from _originally present species_ (i.e. _Species A_): a value of 0.2.
-
-Now, for every study with a `Primary minimal` site, we want to calculate this compositional similarity measure against every other site in the study. Note that this has to be done _within_ studies: it would be pointless to compare similarity between a site from a study of birds with a site from a study of bees.
+Now, for every study with a `Primary minimal` site, we want to calculate this compositional similarity measure against every other site in the study. Note that this has to be done *within* studies: it would be pointless to compare similarity between a site from a study of birds with a site from a study of bees.
 
 Let's first set up the data we're going to use for the compositional similarity models.
 
-```{r}
+``` r
 cd_data_input <- diversity %>%
   
   # drop any rows with unknown LandUse
@@ -169,10 +200,9 @@ cd_data_input <- diversity %>%
   droplevels()
 ```
 
-
 Now we'll set up a function to calculate compositional similarity between every pair of sites in a study.
 
-```{r}
+``` r
 getJacAbSym <- function(s1, s2, data){
 
   # get the list of species that are present in site 1 (i.e., their abundance was greater than 0)
@@ -235,7 +265,7 @@ getJacAbSym <- function(s1, s2, data){
 
 Now that we've set up all the functions to gather the data for the compositional similarity models, let's get the dataset. We'll first get together a vector of all the study IDs that we need to perform the calculations for.
 
-```{r}
+``` r
 # get a vector of each study to loop over
 studies <- distinct(cd_data_input, SS) %>%
   pull()
@@ -243,14 +273,13 @@ studies <- distinct(cd_data_input, SS) %>%
 
 Now we have to loop over each element in `studies` and calculate:
 
-1. the compositional similarity between each pair of sites
-2. the geographic distance between each pair of sites
-3. the land uses for each pair of sites
+1.  the compositional similarity between each pair of sites
+2.  the geographic distance between each pair of sites
+3.  the land uses for each pair of sites
 
 I'm going to do this in parallel, as we're looping over a lot of studies.
 
-```{r calc_comp_sim, cache=TRUE}
-
+``` r
 registerDoParallel(cores = 2)
 
 # If you're not familiar with loops (or with foreach loops):
@@ -320,29 +349,68 @@ cd_data <- foreach(s = studies,
 registerDoSEQ()
 ```
 
-# Run the statistical analysis
+Run the statistical analysis
+============================
 
 In the PREDICTS database, most of the variation in diversity is going to be between Studies - each study looks at different groups in different areas using different sampling methods. This has to be accounted for in the statistical analysis. We do this in a mixed effects framework: we treat studies and blocks as random effects.
 
-## Total Abundance
+Total Abundance
+---------------
+
 Let's start with a simple model of total abundance. Note that the errors in models of ecological abundance are generally non-normal. Usually, we would deal with that by modelling abundance with an error structure, such as poisson or quasipoisson. However, in the PREDICTS database, we take quite a broad view of what counts as an 'abundance' measurement - they are not all whole individuals so they aren't whole numbers. The `lme4` package doesn't really like you using a discrete error structure with continuous data. So instead, we must transform the data. Generally, a log-transformation does well, but in some cases, a square-root transformation helps to normalise the errors. *I'm not going to go through model checking with you here - this is all just to give you an idea of how to model BII, not how to do statistical analysis... Please check your residual plots etc before using models to make inferences and spatial projections!*
 
-```{r}
+``` r
 # run a simple model
 ab_m <- lmer(sqrt(RescaledAbundance) ~ LandUse + (1|SS) + (1|SSB), data = abundance_data)
 summary(ab_m)
 ```
 
+    ## Linear mixed model fit by REML ['lmerMod']
+    ## Formula: sqrt(RescaledAbundance) ~ LandUse + (1 | SS) + (1 | SSB)
+    ##    Data: abundance_data
+    ## 
+    ## REML criterion at convergence: -3150.3
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -3.6754 -0.5860 -0.0550  0.5641  4.4054 
+    ## 
+    ## Random effects:
+    ##  Groups   Name        Variance Std.Dev.
+    ##  SSB      (Intercept) 0.006043 0.07774 
+    ##  SS       (Intercept) 0.025521 0.15975 
+    ##  Residual             0.033383 0.18271 
+    ## Number of obs: 7009, groups:  SSB, 467; SS, 216
+    ## 
+    ## Fixed effects:
+    ##                              Estimate Std. Error t value
+    ## (Intercept)                  0.651260   0.013964  46.637
+    ## LandUseCropland             -0.016003   0.012746  -1.256
+    ## LandUsePasture              -0.013464   0.009998  -1.347
+    ## LandUsePlantation forest    -0.054914   0.013446  -4.084
+    ## LandUsePrimary vegetation   -0.022285   0.009904  -2.250
+    ## LandUseSecondary vegetation  0.034908   0.009004   3.877
+    ## LandUseUrban                -0.066293   0.020714  -3.200
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) LndUsC LndUsP LndUPf LndUPv LndUSv
+    ## LndUsCrplnd -0.259                                   
+    ## LandUsePstr -0.284  0.492                            
+    ## LndUsPlnttf -0.268  0.232  0.294                     
+    ## LndUsPrmryv -0.283  0.328  0.411  0.332              
+    ## LndUsScndrv -0.367  0.422  0.527  0.380  0.510       
+    ## LandUseUrbn -0.164  0.193  0.205  0.141  0.270  0.250
+
 The model shows that all land uses except for secondary vegetation have significantly reduced diversity relative to the baseline (minimally-used primary vegetation). We've just run a very simple model here, but you can add in additional human pressures (e.g., human population density).
 
+Compositional Similarity
+------------------------
 
-## Compositional Similarity
-
-Now let's do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount _natural_ turnover in species with distance. You can also include environmental distance (we've done this previously based on Gower's dissimilarity of climatic variables) and additional human pressures in models like this.
+Now let's do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount *natural* turnover in species with distance. You can also include environmental distance (we've done this previously based on Gower's dissimilarity of climatic variables) and additional human pressures in models like this.
 
 The compositional similarity measure we use is bounded between 0 and 1 - this means the errors will probably not be normally distributed. We've found that a logit transformation (with an adjustment to account for 0s and 1s) works well.
 
-```{r}
+``` r
 # there is some data manipulation we want to do before modelling
 cd_data <- cd_data %>%
   
@@ -369,19 +437,56 @@ cd_m <- lmer(logitCS ~ Contrast + log10geo + (1|SS), data = cd_data)
 summary(cd_m)
 ```
 
+    ## Linear mixed model fit by REML ['lmerMod']
+    ## Formula: logitCS ~ Contrast + log10geo + (1 | SS)
+    ##    Data: cd_data
+    ## 
+    ## REML criterion at convergence: 757398.2
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -2.9033 -0.7263  0.0671  0.5304  3.7308 
+    ## 
+    ## Random effects:
+    ##  Groups   Name        Variance Std.Dev.
+    ##  SS       (Intercept) 6.469    2.543   
+    ##  Residual             9.423    3.070   
+    ## Number of obs: 148985, groups:  SS, 95
+    ## 
+    ## Fixed effects:
+    ##                                              Estimate Std. Error t value
+    ## (Intercept)                                   2.33360    0.28152   8.289
+    ## ContrastPrimary minimal-Primary vegetation   -0.32459    0.03191 -10.171
+    ## ContrastPrimary minimal-Urban                -1.66278    0.04343 -38.285
+    ## ContrastPrimary minimal-Pasture              -1.90225    0.03146 -60.468
+    ## ContrastPrimary minimal-Secondary vegetation  0.10686    0.03659   2.920
+    ## ContrastPrimary minimal-Plantation forest    -0.45909    0.07290  -6.297
+    ## ContrastPrimary minimal-Cropland             -1.20430    0.04511 -26.699
+    ## log10geo                                     -0.28403    0.01069 -26.563
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) CPm-Pv CnPm-U CnPm-P CPm-Sv CPm-Pf CnPm-C
+    ## CntrstPm-Pv -0.026                                          
+    ## CntrstPmn-U -0.005  0.285                                   
+    ## CntrstPmn-P -0.022  0.296  0.164                            
+    ## CntrstPm-Sv -0.043  0.238  0.120  0.286                     
+    ## CntrstPm-Pf -0.038  0.172  0.109  0.118  0.165              
+    ## CntrstPmn-C -0.016  0.213  0.237  0.147  0.222  0.091       
+    ## log10geo    -0.138 -0.046 -0.103 -0.056 -0.035 -0.012 -0.037
+
 Note that you can't trust the significance values of these compositional similarity values. The same site goes into multiple comparisons in the model (each Primary minimal site is compared to all other sites in the study), which will inflate the p-values. If you want to look at significance values, you'll need to run some simulations to check that the values are reliable.
 
-
-# Projecting the model
+Projecting the model
+====================
 
 Now we have one model (`ab_m`) telling us how land-use change influences the total abundance of species and one model (`cs_m`) that tells us what proportion of those individuals are from 'originally present species' in a community. Multiplying these together gives us the BII: the abundance of originally present species. We do this by projecting abundance and compositional similarity onto rasters of pressure data, and then multiplying the two output maps together.
 
-
-## Model predictions
+Model predictions
+-----------------
 
 First of all, let's calculate the actual diversity in each land-use class, ignoring the impact of random effects (see `help(predict.merMod)` for more details on this).
 
-```{r}
+``` r
 # let's start with the abundance model
 
 # set up a dataframe with all the levels you want to predict diversity for
@@ -412,15 +517,18 @@ newdata_cd <- data.frame(Contrast = levels(cd_data$Contrast),
            inv_logit(a = 0.001))
 ```
 
-It's these _predicted_ values (`ab_m_preds` and `cd_m_preds`) that we're going to use to calculate the diversity in each cell of a land-use map. We will multiply the predicted diversity in each land-use class with the area of the cell in that land-use class. However, because we have a mixed effects model, the _absolulte_ value of diversity is somewhat meaningless. Instead, we care about the _relative_ diversity - how much diversity is there relative to what we'd find if the whole landscape was still minimally-used primary vegetation. So once we have the predictions, we divide by the reference value (the predicted diversity in minimally-used primary vegetation for the whole cell).
+It's these *predicted* values (`ab_m_preds` and `cd_m_preds`) that we're going to use to calculate the diversity in each cell of a land-use map. We will multiply the predicted diversity in each land-use class with the area of the cell in that land-use class. However, because we have a mixed effects model, the *absolulte* value of diversity is somewhat meaningless. Instead, we care about the *relative* diversity - how much diversity is there relative to what we'd find if the whole landscape was still minimally-used primary vegetation. So once we have the predictions, we divide by the reference value (the predicted diversity in minimally-used primary vegetation for the whole cell).
 
-## Gather land-use rasters
+Gather land-use rasters
+-----------------------
+
 You can use any land-use data you like, but many land-use maps don't have classes that map easily onto the definitions used by PREDICTS. Noteable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>) and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
 
 I'm just going to simulate some rasters here for ease.
 
 We've got seven land-use classes. Imagine we have seven rasters, one for each land-use class, and the cell value is the proportion of the cell assigned to that land-use class. We'll generate some random numbers for each of the land uses - let's make it mostly cropland, with a fair chunk of pasture and secondary vegetation, with just patches of natural land and urban areas.
-```{r}
+
+``` r
 # generate a dataframe with random numbers for the cell values for each land-use class
 lus <- data.frame(pri_min = rnorm(25, mean = 50, sd = 1),
                   pri = rnorm(25, mean = 100, sd = 25),
@@ -439,12 +547,13 @@ lus <- data.frame(pri_min = rnorm(25, mean = 50, sd = 1),
 
 # double check that the proportions of each land use sum to 1 (accounting for rounding errors)
 all(zapsmall(rowSums(lus)) == 1)
-
 ```
+
+    ## [1] TRUE
 
 Now turn each land use into its own 5 x 5 raster.
 
-```{r}
+``` r
 # for each column of lus (i.e., each land use)
 for(i in 1:ncol(lus)){
   
@@ -462,12 +571,12 @@ for(i in 1:ncol(lus)){
 }
 ```
 
-
-## Spatial projections of BII
+Spatial projections of BII
+--------------------------
 
 Calculate the output rasters for abundance (`ab_raster`) and compositional similarity (`cd_raster`) by multiplying the predictions for each land-use class by the amount of that land-use class in the cell.
 
-```{r}
+``` r
 ab_raster <- (newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary minimal'] * pri_min_raster + 
   newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary vegetation'] * pri_raster + 
   newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Plantation forest'] * plant_raster +
@@ -494,32 +603,32 @@ cd_raster <- (newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Prim
 
 The final step is to multiply the abundance and compositional similarity rasters together. We'll also multiply the values by 100 so that BII is expressed as a percentage rather than a proportion.
 
-```{r}
+``` r
 bii <- ab_raster * cd_raster
 plot(bii * 100)
 ```
 
+![](bii_example_files/figure-markdown_github/unnamed-chunk-15-1.png)
+
 And that is it. A quick walkthrough of how we use the PREDICTS database to model and project the Biodiversity Intactness Index.
 
-# Extensions
+Extensions
+==========
 
-- The model framework is pretty flexible, so you can incorporate additional human pressures (like human population density and road density) into the statistical models of both abundance and compositional similarity.
-- If you'd like to _weight_ your maps of BII, you can also multiply the outputs by additional layers, such as NPP, to give more weight to naturally more diverse areas. 
-- If you have pressure data across time as well as space, you can look at temporal changes in BII (assuming that responses to pressures are the same across these time periods).
+-   The model framework is pretty flexible, so you can incorporate additional human pressures (like human population density and road density) into the statistical models of both abundance and compositional similarity.
+-   If you'd like to *weight* your maps of BII, you can also multiply the outputs by additional layers, such as NPP, to give more weight to naturally more diverse areas.
+-   If you have pressure data across time as well as space, you can look at temporal changes in BII (assuming that responses to pressures are the same across these time periods).
 
-# Advantages
+Advantages
+==========
 
-- BII is empirically derived from a transparent database.
-- BII has been proposed as an indicator useful in assessing whether we have transgressed Planetary Boundaries.
-- Because we are mapping _local_ diversity here, you can also average the map across any spatial scale. 
+-   BII is empirically derived from a transparent database.
+-   BII has been proposed as an indicator useful in assessing whether we have transgressed Planetary Boundaries.
+-   Because we are mapping *local* diversity here, you can also average the map across any spatial scale.
 
-# Limitations
+Limitations
+===========
+
 Hopefully it goes without saying, but the uncertainty in the BII map will depend on its inputs, both in terms of the statistical models and the geospatial data used for projections. The higher the uncertainty in these aspects, the higher the uncertainty in the BII projections. Although land-use mapping is continually advancing, there are still limitations. So using a global map and then drilling down into a single pixel is not really advisable. Instead, the maps are more likely to be reliable when looking over broader areas and larger time steps, rather than pixel by pixel and year by year.
 
 BII is a measure of ecosystem intactness, but we do not expect it to be used in isolation. There are myriad biodiversity metrics and indices out there, and which one you use will depend on what is most important/interesting/relevant to you and your system. BII is just one metric, but can complement others, such as indicators based on extinction risk and population decline.
-
-
-
-
-
-
