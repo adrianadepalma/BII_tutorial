@@ -284,12 +284,18 @@ div.tocify {
 
 <h1 class="title toc-ignore">Calculating the Biodiversity Intactness Index</h1>
 <h4 class="author"><em>Adriana De Palma</em></h4>
-<h4 class="date"><em>05 February, 2019</em></h4>
+<h4 class="date"><em>07 February, 2019</em></h4>
 
 </div>
 
 
 <p>This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We’ll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII. We’ll be using just a subset of the data and a very simple model to start with.</p>
+<div id="about-predicts" class="section level1">
+<h1>About PREDICTS</h1>
+</div>
+<div id="about-bii" class="section level1">
+<h1>About BII</h1>
+</div>
 <div id="load-some-packages" class="section level1">
 <h1>Load some packages</h1>
 <pre class="r"><code>library(dplyr) # for easy data manipulation
@@ -310,7 +316,163 @@ library(doParallel) # running loops in parallel</code></pre>
 diversity &lt;- readRDS(&quot;database.rds&quot;) %&gt;%
   
   # now let's filter out just the data for the Americas
-  filter(UN_region == &quot;Americas&quot;)</code></pre>
+  filter(UN_region == &quot;Americas&quot;)
+
+head(diversity)</code></pre>
+<pre><code>##          Source_ID          Reference Study_number
+## 1 AD1_2005__Shuler Shuler et al. 2005            1
+## 2 AD1_2005__Shuler Shuler et al. 2005            1
+## 3 AD1_2005__Shuler Shuler et al. 2005            1
+## 4 AD1_2005__Shuler Shuler et al. 2005            1
+## 5 AD1_2005__Shuler Shuler et al. 2005            1
+## 6 AD1_2005__Shuler Shuler et al. 2005            1
+##                    Study_name                 SS
+## 1 Shuler2005_flowervisitation AD1_2005__Shuler 1
+## 2 Shuler2005_flowervisitation AD1_2005__Shuler 1
+## 3 Shuler2005_flowervisitation AD1_2005__Shuler 1
+## 4 Shuler2005_flowervisitation AD1_2005__Shuler 1
+## 5 Shuler2005_flowervisitation AD1_2005__Shuler 1
+## 6 Shuler2005_flowervisitation AD1_2005__Shuler 1
+##             Diversity_metric        Diversity_metric_unit
+## 1 effort-corrected abundance effort-corrected individuals
+## 2 effort-corrected abundance effort-corrected individuals
+## 3 effort-corrected abundance effort-corrected individuals
+## 4 effort-corrected abundance effort-corrected individuals
+## 5 effort-corrected abundance effort-corrected individuals
+## 6 effort-corrected abundance effort-corrected individuals
+##   Diversity_metric_type Diversity_metric_is_effort_sensitive
+## 1             Abundance                                FALSE
+## 2             Abundance                                FALSE
+## 3             Abundance                                FALSE
+## 4             Abundance                                FALSE
+## 5             Abundance                                FALSE
+## 6             Abundance                                FALSE
+##   Diversity_metric_is_suitable_for_Chao      Sampling_method
+## 1                                 FALSE systematic searching
+## 2                                 FALSE systematic searching
+## 3                                 FALSE systematic searching
+## 4                                 FALSE systematic searching
+## 5                                 FALSE systematic searching
+## 6                                 FALSE systematic searching
+##   Sampling_effort_unit Study_common_taxon Rank_of_study_common_taxon
+## 1                  day        Hymenoptera                      Order
+## 2                  day        Hymenoptera                      Order
+## 3                  day        Hymenoptera                      Order
+## 4                  day        Hymenoptera                      Order
+## 5                  day        Hymenoptera                      Order
+## 6                  day        Hymenoptera                      Order
+##   Site_number           Site_name Block                  SSS
+## 1           1      Ayrshire Farms       AD1_2005__Shuler 1 1
+## 2           1      Ayrshire Farms       AD1_2005__Shuler 1 1
+## 3           1      Ayrshire Farms       AD1_2005__Shuler 1 1
+## 4           1      Ayrshire Farms       AD1_2005__Shuler 1 1
+## 5           1      Ayrshire Farms       AD1_2005__Shuler 1 1
+## 6           2 Over the Grass Farm       AD1_2005__Shuler 1 2
+##                   SSB                  SSBS Sample_start_earliest
+## 1 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
+## 2 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
+## 3 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
+## 4 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
+## 5 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
+## 6 AD1_2005__Shuler 1  AD1_2005__Shuler 1  2            2003-07-07
+##   Sample_end_latest Sample_midpoint Sample_date_resolution
+## 1        2003-08-05      2003-07-21                    day
+## 2        2003-08-05      2003-07-21                    day
+## 3        2003-08-05      2003-07-21                    day
+## 4        2003-08-05      2003-07-21                    day
+## 5        2003-08-05      2003-07-21                    day
+## 6        2003-08-05      2003-07-21                    day
+##   Max_linear_extent_metres Habitat_patch_area_square_metres
+## 1                 2844.946                          4046856
+## 2                 2844.946                          4046856
+## 3                 2844.946                          4046856
+## 4                 2844.946                          4046856
+## 5                 2844.946                          4046856
+## 6                 1505.404                          1133120
+##   Sampling_effort Rescaled_sampling_effort   Habitat_as_described
+## 1               1                        1 Squash or pumpkin farm
+## 2               1                        1 Squash or pumpkin farm
+## 3               1                        1 Squash or pumpkin farm
+## 4               1                        1 Squash or pumpkin farm
+## 5               1                        1 Squash or pumpkin farm
+## 6               1                        1 Squash or pumpkin farm
+##   Predominant_land_use  Source_for_predominant_land_use Use_intensity
+## 1             Cropland Direct from publication / author     Light use
+## 2             Cropland Direct from publication / author     Light use
+## 3             Cropland Direct from publication / author     Light use
+## 4             Cropland Direct from publication / author     Light use
+## 5             Cropland Direct from publication / author     Light use
+## 6             Cropland Direct from publication / author     Light use
+##   Km_to_nearest_edge_of_habitat Years_since_fragmentation_or_conversion
+## 1                            NA                                      NA
+## 2                            NA                                      NA
+## 3                            NA                                      NA
+## 4                            NA                                      NA
+## 5                            NA                                      NA
+## 6                            NA                                      NA
+##   Transect_details               Coordinates_method Longitude Latitude
+## 1                  Direct from publication / author -77.86848 38.95733
+## 2                  Direct from publication / author -77.86848 38.95733
+## 3                  Direct from publication / author -77.86848 38.95733
+## 4                  Direct from publication / author -77.86848 38.95733
+## 5                  Direct from publication / author -77.86848 38.95733
+## 6                  Direct from publication / author -77.78402 38.83562
+##   Country_distance_metres       Country  UN_subregion UN_region
+## 1                       0 United States North America  Americas
+## 2                       0 United States North America  Americas
+## 3                       0 United States North America  Americas
+## 4                       0 United States North America  Americas
+## 5                       0 United States North America  Americas
+## 6                       0 United States North America  Americas
+##   Ecoregion_distance_metres Ecoregion                               Biome
+## 1                         0  Piedmont Temperate Broadleaf &amp; Mixed Forests
+## 2                         0  Piedmont Temperate Broadleaf &amp; Mixed Forests
+## 3                         0  Piedmont Temperate Broadleaf &amp; Mixed Forests
+## 4                         0  Piedmont Temperate Broadleaf &amp; Mixed Forests
+## 5                         0  Piedmont Temperate Broadleaf &amp; Mixed Forests
+## 6                         0  Piedmont Temperate Broadleaf &amp; Mixed Forests
+##      Realm Hotspot Wilderness_area Taxon_number        Taxon_name_entered
+## 1 Nearctic                                    1            Apis mellifera
+## 2 Nearctic                                    2        Peponapis pruinosa
+## 3 Nearctic                                    3 Auglochlorini/Agapostemon
+## 4 Nearctic                                    4     Melissodes bimaculata
+## 5 Nearctic                                    5                    Bombus
+## 6 Nearctic                                    1            Apis mellifera
+##                       Indication               Parsed_name
+## 1 Hymenoptera: Apidae sensu lato            Apis mellifera
+## 2 Hymenoptera: Apidae sensu lato        Peponapis pruinosa
+## 3 Hymenoptera: Apidae sensu lato Auglochlorini/Agapostemon
+## 4 Hymenoptera: Apidae sensu lato     Melissodes bimaculata
+## 5 Hymenoptera: Apidae sensu lato                    Bombus
+## 6 Hymenoptera: Apidae sensu lato            Apis mellifera
+##                   Taxon   COL_ID   Name_status    Rank  Kingdom     Phylum
+## 1        Apis mellifera  6845885 accepted name Species Animalia Arthropoda
+## 2    Peponapis pruinosa  6927991 accepted name Species Animalia Arthropoda
+## 3            Halictidae 13025322 accepted name  Family Animalia Arthropoda
+## 4 Melissodes bimaculata  6927813 accepted name Species Animalia Arthropoda
+## 5                Bombus 13122214 accepted name   Genus Animalia Arthropoda
+## 6        Apis mellifera  6845885 accepted name Species Animalia Arthropoda
+##     Class       Order     Family      Genus    Species
+## 1 Insecta Hymenoptera     Apidae       Apis  mellifera
+## 2 Insecta Hymenoptera     Apidae  Peponapis   pruinosa
+## 3 Insecta Hymenoptera Halictidae                      
+## 4 Insecta Hymenoptera     Apidae Melissodes bimaculata
+## 5 Insecta Hymenoptera     Apidae     Bombus           
+## 6 Insecta Hymenoptera     Apidae       Apis  mellifera
+##     Best_guess_binomial Higher_taxon Measurement
+## 1        Apis mellifera  Hymenoptera        0.00
+## 2    Peponapis pruinosa  Hymenoptera        0.75
+## 3                        Hymenoptera        0.00
+## 4 Melissodes bimaculata  Hymenoptera        0.00
+## 5                        Hymenoptera        0.00
+## 6        Apis mellifera  Hymenoptera        0.00
+##   Effort_corrected_measurement
+## 1                         0.00
+## 2                         0.75
+## 3                         0.00
+## 4                         0.00
+## 5                         0.00
+## 6                         0.00</code></pre>
 <p>Now let’s explore the data a little.</p>
 <pre class="r"><code>table(diversity$Predominant_land_use, diversity$Use_intensity)</code></pre>
 <pre><code>##                                           
@@ -437,7 +599,7 @@ diversity &lt;- readRDS(&quot;database.rds&quot;) %&gt;%
   
   # drop empty factor levels
   droplevels()</code></pre>
-<p>Now we’ll set up a function to calculate compositional similarity between every pair of sites in a study.</p>
+<p>Now we’ll set up a function to calculate compositional similarity between a single pair of sites in a study.</p>
 <pre class="r"><code>getJacAbSym &lt;- function(s1, s2, data){
 
   # get the list of species that are present in site 1 (i.e., their abundance was greater than 0)
@@ -668,7 +830,7 @@ summary(cd_m)</code></pre>
 ## 
 ## Fixed effects:
 ##                                              Estimate Std. Error t value
-## (Intercept)                                   2.71218    0.29865   9.082
+## (Intercept)                                   2.71218    0.29864   9.082
 ## ContrastPrimary minimal-Primary vegetation   -0.32252    0.03282  -9.827
 ## ContrastPrimary minimal-Urban                -1.63778    0.04461 -36.712
 ## ContrastPrimary minimal-Cropland             -1.18983    0.04634 -25.676

@@ -3,15 +3,15 @@ title: "Calculating the Biodiversity Intactness Index"
 author: "Adriana De Palma"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
-  github_document:
-    toc: yes
-    toc_depth: 4
   html_document:
     collapsed: no
     theme: readable
     toc: yes
     toc_depth: 4
     toc_float: yes
+  github_document:
+    toc: yes
+    toc_depth: 4
 ---
 
 ```{r setup, include=FALSE}
@@ -19,6 +19,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We'll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII. We'll be using just a subset of the data and a very simple model to start with. 
+
+
+# About the PREDICTS database
+PREDICTS stands for Projecting the Responses of Ecological Diversity in Changing Terrestrial Systems. 
+
+
+# About BII
+
+
 
 # Load some packages
 ```{r, message=FALSE, warning=FALSE}
@@ -46,6 +55,8 @@ diversity <- readRDS("database.rds") %>%
   
   # now let's filter out just the data for the Americas
   filter(UN_region == "Americas")
+
+glimpse(diversity)
 ```
 
 Now let's explore the data a little.
@@ -170,7 +181,7 @@ cd_data_input <- diversity %>%
 ```
 
 
-Now we'll set up a function to calculate compositional similarity between every pair of sites in a study.
+Now we'll set up a function to calculate compositional similarity between a single pair of sites in a study.
 
 ```{r}
 getJacAbSym <- function(s1, s2, data){
