@@ -1,36 +1,185 @@
 Calculating the Biodiversity Intactness Index
 ================
 Adriana De Palma
-07 February, 2019
+16 July, 2019
 
--   [About PREDICTS](#about-predicts)
--   [About BII](#about-bii)
--   [Load some packages](#load-some-packages)
--   [Prepare the biodiversity data](#prepare-the-biodiversity-data)
--   [Calculate diversity indices](#calculate-diversity-indices)
-    -   [Total Abundance](#total-abundance)
-    -   [Compositional Similarity](#compositional-similarity)
--   [Run the statistical analysis](#run-the-statistical-analysis)
-    -   [Total Abundance](#total-abundance-1)
-    -   [Compositional Similarity](#compositional-similarity-1)
--   [Projecting the model](#projecting-the-model)
-    -   [Model predictions](#model-predictions)
-    -   [Gather land-use rasters](#gather-land-use-rasters)
-    -   [Spatial projections of BII](#spatial-projections-of-bii)
--   [Extensions](#extensions)
--   [Advantages](#advantages)
--   [Limitations](#limitations)
+  - [About PREDICTS](#about-predicts)
+  - [About BII](#about-bii)
+  - [Load some packages](#load-some-packages)
+  - [Prepare the biodiversity data](#prepare-the-biodiversity-data)
+  - [Calculate diversity indices](#calculate-diversity-indices)
+      - [Total Abundance](#total-abundance)
+      - [Compositional Similarity](#compositional-similarity)
+  - [Run the statistical analysis](#run-the-statistical-analysis)
+      - [Total Abundance](#total-abundance-1)
+      - [Compositional Similarity](#compositional-similarity-1)
+  - [Projecting the model](#projecting-the-model)
+      - [Model predictions](#model-predictions)
+      - [Gather land-use rasters](#gather-land-use-rasters)
+      - [Spatial projections of BII](#spatial-projections-of-bii)
+  - [Extensions](#extensions)
+      - [Validation](#validation)
+  - [Advantages](#advantages)
+  - [Limitations](#limitations)
 
-This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We'll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII. We'll be using just a subset of the data and a very simple model to start with.
+This tutorial gives a step-by-step guide on how to calculate the
+Biodiversity Intactness Index (BII) using the PREDICTS database. We’ll
+go through where to find the PREDICTS data, how we go about analysing
+this data and finally how to project and calculate BII, using `R`. We’ll
+be using just a subset of the data and a very simple model to start
+with.
 
-About PREDICTS
-==============
+# About PREDICTS
 
-About BII
-=========
+<details>
 
-Load some packages
-==================
+<summary>[PREDICTS](https://www.predicts.org.uk/) - Projecting Responses
+of Ecological Diversity In Changing Terrestrial Systems - is a
+collaboration that aims to model how local terrestrial biodiversity
+worldwide responds to land use and related pressures, and to use such
+models to project how biodiversity may change under future socioeconomic
+scenarios. *Expand to learn more* </summary>The PREDICTS team have
+collated a large database of biodiversity data from over 29,000 sites
+worldwide. These data have been provided by authors of over 700 separate
+surveys, each of which sampled biodiversity at multiple sites facing
+different land-use and related pressures. Although the different surveys
+have used a very wide range of different techniques, and focused on a
+wide array of different plant, fungal, invertebrate or vertebrate taxa
+(the database now holds data from over 50,000 species), the data from
+different sites within a survey are comparable, having been collected in
+the same way. Each site’s land use and land-use intensity has been
+classified into a consistent set of categories, based on information in
+the paper or from the authors, and some other human pressures (e.g.,
+human population density) are estimated for each site from global
+rasters. Details of how the database was put together - including
+definitions of our land-use and use-intensity classes - can be found in
+[this
+paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303); the
+first released version of the database is available from the [Natural
+History Museum’s data portal](https://data.nhm.ac.uk/), and is described
+in [this
+paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.2579).
+
+Because the database holds the original biodiversity data, statistical
+analysis can model a wide range of response variables (as explained in
+[this
+paper](https://www.sciencedirect.com/science/article/pii/S0065250417300284)),
+including site-level measures of diversity (such as [within-sample
+species richness, rarefaction-based richness or overall organismal
+abundance](https://www.nature.com/articles/nature14324)), [among-site
+differences in community
+composition](https://onlinelibrary.wiley.com/doi/full/10.1111/ecog.01932),
+or [the occurrence and/or population size of each
+species](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2664.12524).
+Combining our data with other species-level information permits
+modelling of [functional and phylogenetic
+diversity](https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638) or of
+[a community-weighted measure of geographic range
+size](https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.2006841).
+This walkthrough document focuses on modelling two response variables:
+total site-level abundance, and compositional similarity between sites.
+
+Because the surveys in the database arise from such very different
+methodologies, we fit mixed-effects models with survey-level random
+effects, allowing us to focus on how human pressures affect the response
+variable while acknowledging the among-survey heterogeneity. We assume
+that biotic differences among matched sites with different land uses are
+caused by the land-use difference, a form of space-for-time
+substitution. Some of our models also assume that the biota at sites
+with minimally-used primary vegetation (and minimal levels of other
+pressures) approximates their pristine biota. These assumptions would
+not be needed if representative long-term temporal data were available.
+
+Models can be fitted to the whole global data or to regions of
+particular interest (such as [tropical and subtropical forest
+biomes](https://www.biorxiv.org/content/10.1101/311688v3)). The models
+can be combined with detailed spatiotemporal data on the pressures [to
+map the projected current state of the response
+variable](https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638),
+[estimate how it has changed in the
+past](https://www.biorxiv.org/content/10.1101/311688v3), or [project its
+future under alternative
+scenarios](https://www.biorxiv.org/content/10.1101/311787v1).
+
+</details>
+
+# About BII
+
+<details>
+
+<summary>The Biodiversity Intactness Index (BII) was initially [proposed
+in 2005](https://www.nature.com/articles/nature03289) as a sound,
+sensitive, easily understood and affordable biodiversity indicator that
+could easily be applied at any spatial scale and would allow for
+comparison with a policy target and a baseline. BII is defined as the
+average abundance, across a large and functionally diverse set of
+species, relative to their reference populations (which would ideally be
+populations before any impacts of modern industrial society, but which
+practically have to be populations in the least impacted settings
+available); non-native species are excluded from the calculation.
+*Expand to learn more*</summary>
+
+BII became more prominent with its adoption in the [2015 revision of the
+Planetary Boundaries
+framework](https://science.sciencemag.org/content/347/6223/1259855) as
+an interim measure of biosphere integrity. The framework proposed that
+reduction of average BII to below 90% across a large region such as a
+biome would risk large-scale disruption of the flow of ecosystem
+services and jeopardise sustainable development, though the paper
+acknowledged that the precise placement of the ‘safe limit’ for BII was
+very uncertain.
+
+In the absence of sufficient collated biodiversity data, BII was
+initially [estimated](https://www.nature.com/articles/nature03289) using
+carefully-structured expert opinion. The PREDICTS team [first estimated
+BII based on primary biodiversity data
+in 2016](https://science.sciencemag.org/content/353/6296/288), by
+combining two statistical models - one of site-level organismal
+abundance, and one of compositional similarity to a site still having
+primary vegetation. The latter model was needed to account for the fact
+that models of overall organismal abundance do not consider turnover in
+species composition. Although we gave several reasons why our estimates
+of BII were likely to be overoptimistic, our 2016 estimates nonetheless
+placed the world, nearly all biomes and nearly all biodiversity hotspots
+below the proposed ‘safe limit’ for BII.
+
+We have [continued to refine the modelling framework to improve our
+estimates of BII](https://www.biorxiv.org/content/10.1101/311688v3). The
+most important improvements since the 2016 paper have been:
+
+  - Use of a more stringent baseline in models of compositional
+    similarity. Whereas the 2016 paper used all primary vegetation sites
+    (even those with intense human use) as the baseline land use, growth
+    of the database and a switch to a more efficient (matrix-based)
+    model framework have allowed us to use only minimally-used primary
+    vegetation as the baseline.
+  - A more principled transformation of the compositional similarity
+    estimates prior to modelling. Although the log-transformation used
+    in the 2016 paper produced acceptable model diagnostics, it does not
+    recognise the bounded nature of compositional similarity (which can
+    range from 0 to 1). We now use a logit transformation instead, which
+    provides more sensitive discrimination among land uses.
+
+The estimates of BII that result from the improved framework tend to be
+[markedly lower than those we obtained
+in 2016](https://www.nature.com/articles/s41559-019-0896-0). One issue
+that remains to be addressed is that the land-use rasters we have been
+using to make spatial projections do not differentiate planted from
+natural forest, meaning our estimates are still likely to be too high in
+regions with extensive planted forest. Work to address this shortcoming
+is underway.
+
+BII, being an indicator of the average state of local ecological
+communities, complements indicators based on species’ global
+conservation status (such as the Red List Index), or on population
+trends (such as the Living Planet Index). These different facets of
+biodiversity are all important, and [can be combined to provide a
+roadmap towards restoring global
+biodiversity](https://www.nature.com/articles/s41893-018-0130-0).
+
+</details>
+
+# Load some packages
 
 ``` r
 library(dplyr) # for easy data manipulation
@@ -44,12 +193,19 @@ library(foreach) # running loops
 library(doParallel) # running loops in parallel
 ```
 
-Prepare the biodiversity data
-=============================
+# Prepare the biodiversity data
 
-You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a/>. If you're working in `R`, I would strongly suggest downloading `database.rds` (the database is very large, and the rds file is much quicker to load in than the csv file).
+You can download the PREDICTS data from the
+<a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural
+History Museum data portal<a/>. If you’re working in `R`, I would
+strongly suggest downloading `database.rds` (the database is very large,
+and the rds file is much quicker to load in than the csv file).
 
-Once you've downloaded the database, read it in. I'm going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for *any* region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.
+Once you’ve downloaded the database, read it in. I’m going to filter the
+data for just the Americas, to make the data manipulation and modelling
+a bit quicker. You can calculate BII for *any* region of the world for
+which there are data, although we tend to do our BII modelling on a
+global scale or at least across multiple biomes.
 
 ``` r
 # read in the data
@@ -58,165 +214,90 @@ diversity <- readRDS("database.rds") %>%
   # now let's filter out just the data for the Americas
   filter(UN_region == "Americas")
 
-head(diversity)
+glimpse(diversity)
 ```
 
-    ##          Source_ID          Reference Study_number
-    ## 1 AD1_2005__Shuler Shuler et al. 2005            1
-    ## 2 AD1_2005__Shuler Shuler et al. 2005            1
-    ## 3 AD1_2005__Shuler Shuler et al. 2005            1
-    ## 4 AD1_2005__Shuler Shuler et al. 2005            1
-    ## 5 AD1_2005__Shuler Shuler et al. 2005            1
-    ## 6 AD1_2005__Shuler Shuler et al. 2005            1
-    ##                    Study_name                 SS
-    ## 1 Shuler2005_flowervisitation AD1_2005__Shuler 1
-    ## 2 Shuler2005_flowervisitation AD1_2005__Shuler 1
-    ## 3 Shuler2005_flowervisitation AD1_2005__Shuler 1
-    ## 4 Shuler2005_flowervisitation AD1_2005__Shuler 1
-    ## 5 Shuler2005_flowervisitation AD1_2005__Shuler 1
-    ## 6 Shuler2005_flowervisitation AD1_2005__Shuler 1
-    ##             Diversity_metric        Diversity_metric_unit
-    ## 1 effort-corrected abundance effort-corrected individuals
-    ## 2 effort-corrected abundance effort-corrected individuals
-    ## 3 effort-corrected abundance effort-corrected individuals
-    ## 4 effort-corrected abundance effort-corrected individuals
-    ## 5 effort-corrected abundance effort-corrected individuals
-    ## 6 effort-corrected abundance effort-corrected individuals
-    ##   Diversity_metric_type Diversity_metric_is_effort_sensitive
-    ## 1             Abundance                                FALSE
-    ## 2             Abundance                                FALSE
-    ## 3             Abundance                                FALSE
-    ## 4             Abundance                                FALSE
-    ## 5             Abundance                                FALSE
-    ## 6             Abundance                                FALSE
-    ##   Diversity_metric_is_suitable_for_Chao      Sampling_method
-    ## 1                                 FALSE systematic searching
-    ## 2                                 FALSE systematic searching
-    ## 3                                 FALSE systematic searching
-    ## 4                                 FALSE systematic searching
-    ## 5                                 FALSE systematic searching
-    ## 6                                 FALSE systematic searching
-    ##   Sampling_effort_unit Study_common_taxon Rank_of_study_common_taxon
-    ## 1                  day        Hymenoptera                      Order
-    ## 2                  day        Hymenoptera                      Order
-    ## 3                  day        Hymenoptera                      Order
-    ## 4                  day        Hymenoptera                      Order
-    ## 5                  day        Hymenoptera                      Order
-    ## 6                  day        Hymenoptera                      Order
-    ##   Site_number           Site_name Block                  SSS
-    ## 1           1      Ayrshire Farms       AD1_2005__Shuler 1 1
-    ## 2           1      Ayrshire Farms       AD1_2005__Shuler 1 1
-    ## 3           1      Ayrshire Farms       AD1_2005__Shuler 1 1
-    ## 4           1      Ayrshire Farms       AD1_2005__Shuler 1 1
-    ## 5           1      Ayrshire Farms       AD1_2005__Shuler 1 1
-    ## 6           2 Over the Grass Farm       AD1_2005__Shuler 1 2
-    ##                   SSB                  SSBS Sample_start_earliest
-    ## 1 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
-    ## 2 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
-    ## 3 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
-    ## 4 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
-    ## 5 AD1_2005__Shuler 1  AD1_2005__Shuler 1  1            2003-07-07
-    ## 6 AD1_2005__Shuler 1  AD1_2005__Shuler 1  2            2003-07-07
-    ##   Sample_end_latest Sample_midpoint Sample_date_resolution
-    ## 1        2003-08-05      2003-07-21                    day
-    ## 2        2003-08-05      2003-07-21                    day
-    ## 3        2003-08-05      2003-07-21                    day
-    ## 4        2003-08-05      2003-07-21                    day
-    ## 5        2003-08-05      2003-07-21                    day
-    ## 6        2003-08-05      2003-07-21                    day
-    ##   Max_linear_extent_metres Habitat_patch_area_square_metres
-    ## 1                 2844.946                          4046856
-    ## 2                 2844.946                          4046856
-    ## 3                 2844.946                          4046856
-    ## 4                 2844.946                          4046856
-    ## 5                 2844.946                          4046856
-    ## 6                 1505.404                          1133120
-    ##   Sampling_effort Rescaled_sampling_effort   Habitat_as_described
-    ## 1               1                        1 Squash or pumpkin farm
-    ## 2               1                        1 Squash or pumpkin farm
-    ## 3               1                        1 Squash or pumpkin farm
-    ## 4               1                        1 Squash or pumpkin farm
-    ## 5               1                        1 Squash or pumpkin farm
-    ## 6               1                        1 Squash or pumpkin farm
-    ##   Predominant_land_use  Source_for_predominant_land_use Use_intensity
-    ## 1             Cropland Direct from publication / author     Light use
-    ## 2             Cropland Direct from publication / author     Light use
-    ## 3             Cropland Direct from publication / author     Light use
-    ## 4             Cropland Direct from publication / author     Light use
-    ## 5             Cropland Direct from publication / author     Light use
-    ## 6             Cropland Direct from publication / author     Light use
-    ##   Km_to_nearest_edge_of_habitat Years_since_fragmentation_or_conversion
-    ## 1                            NA                                      NA
-    ## 2                            NA                                      NA
-    ## 3                            NA                                      NA
-    ## 4                            NA                                      NA
-    ## 5                            NA                                      NA
-    ## 6                            NA                                      NA
-    ##   Transect_details               Coordinates_method Longitude Latitude
-    ## 1                  Direct from publication / author -77.86848 38.95733
-    ## 2                  Direct from publication / author -77.86848 38.95733
-    ## 3                  Direct from publication / author -77.86848 38.95733
-    ## 4                  Direct from publication / author -77.86848 38.95733
-    ## 5                  Direct from publication / author -77.86848 38.95733
-    ## 6                  Direct from publication / author -77.78402 38.83562
-    ##   Country_distance_metres       Country  UN_subregion UN_region
-    ## 1                       0 United States North America  Americas
-    ## 2                       0 United States North America  Americas
-    ## 3                       0 United States North America  Americas
-    ## 4                       0 United States North America  Americas
-    ## 5                       0 United States North America  Americas
-    ## 6                       0 United States North America  Americas
-    ##   Ecoregion_distance_metres Ecoregion                               Biome
-    ## 1                         0  Piedmont Temperate Broadleaf & Mixed Forests
-    ## 2                         0  Piedmont Temperate Broadleaf & Mixed Forests
-    ## 3                         0  Piedmont Temperate Broadleaf & Mixed Forests
-    ## 4                         0  Piedmont Temperate Broadleaf & Mixed Forests
-    ## 5                         0  Piedmont Temperate Broadleaf & Mixed Forests
-    ## 6                         0  Piedmont Temperate Broadleaf & Mixed Forests
-    ##      Realm Hotspot Wilderness_area Taxon_number        Taxon_name_entered
-    ## 1 Nearctic                                    1            Apis mellifera
-    ## 2 Nearctic                                    2        Peponapis pruinosa
-    ## 3 Nearctic                                    3 Auglochlorini/Agapostemon
-    ## 4 Nearctic                                    4     Melissodes bimaculata
-    ## 5 Nearctic                                    5                    Bombus
-    ## 6 Nearctic                                    1            Apis mellifera
-    ##                       Indication               Parsed_name
-    ## 1 Hymenoptera: Apidae sensu lato            Apis mellifera
-    ## 2 Hymenoptera: Apidae sensu lato        Peponapis pruinosa
-    ## 3 Hymenoptera: Apidae sensu lato Auglochlorini/Agapostemon
-    ## 4 Hymenoptera: Apidae sensu lato     Melissodes bimaculata
-    ## 5 Hymenoptera: Apidae sensu lato                    Bombus
-    ## 6 Hymenoptera: Apidae sensu lato            Apis mellifera
-    ##                   Taxon   COL_ID   Name_status    Rank  Kingdom     Phylum
-    ## 1        Apis mellifera  6845885 accepted name Species Animalia Arthropoda
-    ## 2    Peponapis pruinosa  6927991 accepted name Species Animalia Arthropoda
-    ## 3            Halictidae 13025322 accepted name  Family Animalia Arthropoda
-    ## 4 Melissodes bimaculata  6927813 accepted name Species Animalia Arthropoda
-    ## 5                Bombus 13122214 accepted name   Genus Animalia Arthropoda
-    ## 6        Apis mellifera  6845885 accepted name Species Animalia Arthropoda
-    ##     Class       Order     Family      Genus    Species
-    ## 1 Insecta Hymenoptera     Apidae       Apis  mellifera
-    ## 2 Insecta Hymenoptera     Apidae  Peponapis   pruinosa
-    ## 3 Insecta Hymenoptera Halictidae                      
-    ## 4 Insecta Hymenoptera     Apidae Melissodes bimaculata
-    ## 5 Insecta Hymenoptera     Apidae     Bombus           
-    ## 6 Insecta Hymenoptera     Apidae       Apis  mellifera
-    ##     Best_guess_binomial Higher_taxon Measurement
-    ## 1        Apis mellifera  Hymenoptera        0.00
-    ## 2    Peponapis pruinosa  Hymenoptera        0.75
-    ## 3                        Hymenoptera        0.00
-    ## 4 Melissodes bimaculata  Hymenoptera        0.00
-    ## 5                        Hymenoptera        0.00
-    ## 6        Apis mellifera  Hymenoptera        0.00
-    ##   Effort_corrected_measurement
-    ## 1                         0.00
-    ## 2                         0.75
-    ## 3                         0.00
-    ## 4                         0.00
-    ## 5                         0.00
-    ## 6                         0.00
+    ## Observations: 825,682
+    ## Variables: 67
+    ## $ Source_ID                               <fct> AD1_2005__Shuler, AD1_...
+    ## $ Reference                               <fct> Shuler et al. 2005, Sh...
+    ## $ Study_number                            <int> 1, 1, 1, 1, 1, 1, 1, 1...
+    ## $ Study_name                              <fct> Shuler2005_flowervisit...
+    ## $ SS                                      <fct> AD1_2005__Shuler 1, AD...
+    ## $ Diversity_metric                        <fct> effort-corrected abund...
+    ## $ Diversity_metric_unit                   <fct> effort-corrected indiv...
+    ## $ Diversity_metric_type                   <fct> Abundance, Abundance, ...
+    ## $ Diversity_metric_is_effort_sensitive    <lgl> FALSE, FALSE, FALSE, F...
+    ## $ Diversity_metric_is_suitable_for_Chao   <lgl> FALSE, FALSE, FALSE, F...
+    ## $ Sampling_method                         <fct> systematic searching, ...
+    ## $ Sampling_effort_unit                    <fct> day, day, day, day, da...
+    ## $ Study_common_taxon                      <fct> Hymenoptera, Hymenopte...
+    ## $ Rank_of_study_common_taxon              <fct> Order, Order, Order, O...
+    ## $ Site_number                             <int> 1, 1, 1, 1, 1, 2, 2, 2...
+    ## $ Site_name                               <fct> Ayrshire Farms, Ayrshi...
+    ## $ Block                                   <fct> , , , , , , , , , , , ...
+    ## $ SSS                                     <fct> AD1_2005__Shuler 1 1, ...
+    ## $ SSB                                     <fct> AD1_2005__Shuler 1 , A...
+    ## $ SSBS                                    <fct> AD1_2005__Shuler 1  1,...
+    ## $ Sample_start_earliest                   <date> 2003-07-07, 2003-07-0...
+    ## $ Sample_end_latest                       <date> 2003-08-05, 2003-08-0...
+    ## $ Sample_midpoint                         <date> 2003-07-21, 2003-07-2...
+    ## $ Sample_date_resolution                  <fct> day, day, day, day, da...
+    ## $ Max_linear_extent_metres                <dbl> 2844.9464, 2844.9464, ...
+    ## $ Habitat_patch_area_square_metres        <dbl> 4046856.4, 4046856.4, ...
+    ## $ Sampling_effort                         <dbl> 1, 1, 1, 1, 1, 1, 1, 1...
+    ## $ Rescaled_sampling_effort                <dbl> 1, 1, 1, 1, 1, 1, 1, 1...
+    ## $ Habitat_as_described                    <fct> Squash or pumpkin farm...
+    ## $ Predominant_land_use                    <fct> Cropland, Cropland, Cr...
+    ## $ Source_for_predominant_land_use         <fct> Direct from publicatio...
+    ## $ Use_intensity                           <fct> Light use, Light use, ...
+    ## $ Km_to_nearest_edge_of_habitat           <dbl> NA, NA, NA, NA, NA, NA...
+    ## $ Years_since_fragmentation_or_conversion <dbl> NA, NA, NA, NA, NA, NA...
+    ## $ Transect_details                        <fct> , , , , , , , , , , , ...
+    ## $ Coordinates_method                      <fct> Direct from publicatio...
+    ## $ Longitude                               <dbl> -77.86848, -77.86848, ...
+    ## $ Latitude                                <dbl> 38.95733, 38.95733, 38...
+    ## $ Country_distance_metres                 <dbl> 0, 0, 0, 0, 0, 0, 0, 0...
+    ## $ Country                                 <fct> United States, United ...
+    ## $ UN_subregion                            <fct> North America, North A...
+    ## $ UN_region                               <fct> Americas, Americas, Am...
+    ## $ Ecoregion_distance_metres               <dbl> 0, 0, 0, 0, 0, 0, 0, 0...
+    ## $ Ecoregion                               <fct> Piedmont, Piedmont, Pi...
+    ## $ Biome                                   <fct> Temperate Broadleaf & ...
+    ## $ Realm                                   <fct> Nearctic, Nearctic, Ne...
+    ## $ Hotspot                                 <fct> , , , , , , , , , , , ...
+    ## $ Wilderness_area                         <fct> , , , , , , , , , , , ...
+    ## $ Taxon_number                            <int> 1, 2, 3, 4, 5, 1, 2, 3...
+    ## $ Taxon_name_entered                      <fct> Apis mellifera, Pepona...
+    ## $ Indication                              <fct> Hymenoptera: Apidae se...
+    ## $ Parsed_name                             <fct> Apis mellifera, Pepona...
+    ## $ Taxon                                   <fct> Apis mellifera, Pepona...
+    ## $ COL_ID                                  <int> 6845885, 6927991, 1302...
+    ## $ Name_status                             <fct> accepted name, accepte...
+    ## $ Rank                                    <fct> Species, Species, Fami...
+    ## $ Kingdom                                 <fct> Animalia, Animalia, An...
+    ## $ Phylum                                  <fct> Arthropoda, Arthropoda...
+    ## $ Class                                   <fct> Insecta, Insecta, Inse...
+    ## $ Order                                   <fct> Hymenoptera, Hymenopte...
+    ## $ Family                                  <fct> Apidae, Apidae, Halict...
+    ## $ Genus                                   <fct> Apis, Peponapis, , Mel...
+    ## $ Species                                 <fct> mellifera, pruinosa, ,...
+    ## $ Best_guess_binomial                     <fct> Apis mellifera, Pepona...
+    ## $ Higher_taxon                            <fct> Hymenoptera, Hymenopte...
+    ## $ Measurement                             <dbl> 0.00, 0.75, 0.00, 0.00...
+    ## $ Effort_corrected_measurement            <dbl> 0.00, 0.75, 0.00, 0.00...
 
-Now let's explore the data a little.
+[This paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303)
+describes the PREDICTS database structure and content. Briefly, the
+database consists of a number of different sources (journal articles),
+`Source_ID` in the database, within which there can be multiple studies
+(`Study_name` and `Study_number`). Within each studies, there are
+multiple sites (`Site_name` and `Site_number`) within blocks (`Block`).
+For ease, we use the combined, shorthand values for these: `SS` (Study
+number and Source), `SSB` (`SS` and Block) and `SSBS` (`SSB` and site
+number).
+
+Now let’s explore the data a little.
 
 ``` r
 table(diversity$Predominant_land_use, diversity$Use_intensity)
@@ -247,9 +328,16 @@ table(diversity$Predominant_land_use, diversity$Use_intensity)
     ##   Urban                                           1772           332
     ##   Cannot decide                                      0          3438
 
-There's lots of data for the Americas across all land-use and intensity classes. Since we're using a simplified model for illustration purposes, we're not going to look at *all* the use intensities here. However, we will keep *minimally-used primary vegetation* separate, as this is the closest we have to a *pristine* baseline.
+There’s lots of data for the Americas across all land-use and intensity
+classes. Since we’re using a simplified model for illustration purposes,
+we’re not going to look at *all* the use intensities here. However, we
+will keep *minimally-used primary vegetation* separate, as this is the
+closest we have to a *pristine* baseline.
 
-So let's collapse down the data. Note that I'm doing this purely to make the example simpler. In reality, we include multiple land use and intensity combinations, including the age of secondary vegetation when possible.
+So let’s collapse down the data. Note that I’m doing this purely to make
+the example simpler. In reality, we include multiple land use and
+intensity combinations, including the age class of secondary vegetation
+when possible.
 
 ``` r
 diversity <- diversity %>%
@@ -275,15 +363,16 @@ diversity <- diversity %>%
   )
 ```
 
-Calculate diversity indices
-===========================
+# Calculate diversity indices
 
-The Biodiversity Intactness Index is derived from combining two models: one of total abundance, and one of compositional similarity. We're going to calculate these diversity metrics now.
+The Biodiversity Intactness Index is derived from combining two models:
+one of total abundance, and one of compositional similarity. We’re going
+to calculate these diversity metrics now.
 
-Total Abundance
----------------
+## Total Abundance
 
-Total abundance is simply the sum of all individuals sampled at each site.
+Total abundance is simply the sum of all individuals sampled at each
+site.
 
 ``` r
 abundance_data <- diversity %>%
@@ -316,16 +405,30 @@ abundance_data <- diversity %>%
   mutate(RescaledAbundance = TotalAbundance/MaxAbundance)
 ```
 
-Compositional Similarity
-------------------------
+## Compositional Similarity
 
-We use the *asymmetric Jaccard Index* as our measure of compositional similarity. Essentially, we want to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site.
+We use the *asymmetric Jaccard Index* as our measure of compositional
+similarity. Essentially, we want to know what species are present in our
+baseline sites (`Primary minimal`), and then for our converted sites
+(all other land uses), what proportion of individuals come from species
+that are also found in the baseline site.
 
-As an example, let's look at the following simple scenario. Our primary minimal site had 15 *Species A* individuals and 30 *Species B* individuals. A cropland site has 10 *Species A* and 40 *Species C* individuals. The compositional similarity measure that we use currently would say that only 10 out of a total 50 individuals in the cropland site were from *originally present species* (i.e. *Species A*): a value of 0.2.
+As an example, let’s look at the following simple scenario. Our primary
+minimal site had 15 *Species A* individuals and 30 *Species B*
+individuals. A cropland site has 10 *Species A* and 40 *Species C*
+individuals. The compositional similarity measure that we use currently
+would say that only 10 out of a total 50 individuals in the cropland
+site were from *originally present species* (i.e. *Species A*): a value
+of 0.2.
 
-Now, for every study with a `Primary minimal` site, we want to calculate this compositional similarity measure against every other site in the study. Note that this has to be done *within* studies: it would be pointless to compare similarity between a site from a study of birds with a site from a study of bees.
+Now, for every study with a `Primary minimal` site, we want to calculate
+this compositional similarity measure against every other site in the
+study. Note that this has to be done *within* studies: it would be
+pointless to compare similarity between a site from a study of birds
+with a site from a study of bees.
 
-Let's first set up the data we're going to use for the compositional similarity models.
+Let’s first set up the data we’re going to use for the compositional
+similarity models.
 
 ``` r
 cd_data_input <- diversity %>%
@@ -365,7 +468,8 @@ cd_data_input <- diversity %>%
   droplevels()
 ```
 
-Now we'll set up a function to calculate compositional similarity between a single pair of sites in a study.
+Now we’ll set up a function to calculate compositional similarity
+between a single pair of sites in a study.
 
 ``` r
 getJacAbSym <- function(s1, s2, data){
@@ -428,7 +532,10 @@ getJacAbSym <- function(s1, s2, data){
   }
 ```
 
-Now that we've set up all the functions to gather the data for the compositional similarity models, let's get the dataset. We'll first get together a vector of all the study IDs that we need to perform the calculations for.
+Now that we’ve set up all the functions to gather the data for the
+compositional similarity models, let’s get the dataset. We’ll first get
+together a vector of all the study IDs that we need to perform the
+calculations for.
 
 ``` r
 # get a vector of each study to loop over
@@ -442,7 +549,8 @@ Now we have to loop over each element in `studies` and calculate:
 2.  the geographic distance between each pair of sites
 3.  the land uses for each pair of sites
 
-I'm going to do this in parallel, as we're looping over a lot of studies.
+I’m going to do this in parallel, as we’re looping over a lot of
+studies.
 
 ``` r
 registerDoParallel(cores = 2)
@@ -514,15 +622,31 @@ cd_data <- foreach(s = studies,
 registerDoSEQ()
 ```
 
-Run the statistical analysis
-============================
+# Run the statistical analysis
 
-In the PREDICTS database, most of the variation in diversity is going to be between Studies - each study looks at different groups in different areas using different sampling methods. This has to be accounted for in the statistical analysis. We do this in a mixed effects framework: we treat studies and blocks as random effects.
+In the PREDICTS database, most of the variation in diversity is going to
+be between Studies - each study looks at different groups in different
+areas using different sampling methods. This has to be accounted for in
+the statistical analysis. We do this in a mixed effects framework: we
+treat studies and blocks as random effects.
 
-Total Abundance
----------------
+## Total Abundance
 
-Let's start with a simple model of total abundance. Note that the errors in models of ecological abundance are generally non-normal. Usually, we would deal with that by modelling abundance with an error structure, such as poisson or quasipoisson. However, in the PREDICTS database, we take quite a broad view of what counts as an 'abundance' measurement - they are not all whole individuals so they aren't whole numbers. The `lme4` package doesn't really like you using a discrete error structure with continuous data. So instead, we must transform the data. Generally, a log-transformation does well, but in some cases, a square-root transformation helps to normalise the errors. *I'm not going to go through model checking with you here - this is all just to give you an idea of how to model BII, not how to do statistical analysis... Please check your residual plots etc before using models to make inferences and spatial projections!*
+Let’s start with a simple model of total abundance. Note that the errors
+in models of ecological abundance are generally non-normal. Usually, we
+would deal with that by modelling abundance with an error structure,
+such as poisson or quasipoisson. However, in the PREDICTS database, we
+take quite a broad view of what counts as an ‘abundance’ measurement -
+they are not all whole individuals so they aren’t whole numbers (e.g.,
+they might be expressed as average numbers per square metre). The `lme4`
+package doesn’t really like you using a discrete error structure with
+continuous data. So instead, we must transform the data. Generally, a
+log-transformation does well, but in some cases, a square-root
+transformation helps to normalise the errors. *I’m not going to go
+through model checking with you here - this is all just to give you an
+idea of how to model BII, not how to do statistical analysis… Please
+check your residual plots etc before using models to make inferences and
+spatial projections\!*
 
 ``` r
 # run a simple model
@@ -566,14 +690,28 @@ summary(ab_m)
     ## LndUsScndrv -0.367  0.422  0.527  0.380  0.510       
     ## LandUseUrbn -0.164  0.193  0.205  0.141  0.270  0.250
 
-The model shows that all land uses except for secondary vegetation have significantly reduced diversity relative to the baseline (minimally-used primary vegetation). We've just run a very simple model here, but you can add in additional human pressures (e.g., human population density).
+The model shows that all land uses except for secondary vegetation have
+lower total abundance than the baseline (minimally-used primary
+vegetation), some of them significantly so. We’ve just run a very simple
+model here, but you can add in additional human pressures (e.g., human
+population density).
 
-Compositional Similarity
-------------------------
+## Compositional Similarity
 
-Now let's do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount *natural* turnover in species with distance. You can also include environmental distance (we've done this previously based on Gower's dissimilarity of climatic variables) and additional human pressures in models like this.
+Now let’s do a model of compositional similarity. For compositional
+similarity models, we include a measure of the geographic distance
+beween sites. This allows us to discount *natural* turnover in species
+with distance. You can also include environmental distance (we’ve done
+this previously based on Gower’s dissimilarity of climatic variables)
+and additional human pressures in models like this.
 
-The compositional similarity measure we use is bounded between 0 and 1 - this means the errors will probably not be normally distributed. We've found that a logit transformation (with an adjustment to account for 0s and 1s) works well.
+The compositional similarity measure we use is bounded between 0 and 1 -
+this means the errors will probably not be normally distributed.
+Although log-transformation produced models with acceptable diagnostics,
+it doesn’t respect the boundedness of the compositional similarity
+measure. We’ve found that a logit transformation (with an adjustment to
+account for 0s and 1s), which does recognise the boundedness, also gives
+acceptable diagnostics.
 
 ``` r
 # there is some data manipulation we want to do before modelling
@@ -639,17 +777,29 @@ summary(cd_m)
     ## CntrstPmn-C -0.016  0.213  0.237  0.147  0.222  0.091       
     ## log10geo    -0.138 -0.046 -0.103 -0.056 -0.035 -0.012 -0.037
 
-Note that you can't trust the significance values of these compositional similarity values. The same site goes into multiple comparisons in the model (each Primary minimal site is compared to all other sites in the study), which will inflate the p-values. If you want to look at significance values, you'll need to run some simulations to check that the values are reliable.
+Note that you can’t trust the significance values of these compositional
+similarity values. The same site goes into multiple comparisons in the
+model (each Primary minimal site is compared to all other sites in the
+study), which will inflate the p-values. If you want to look at
+significance values, you’ll need to use permutation tests in order to
+see which effects are significant. We’re not going to do that here
+because they can take a while.
 
-Projecting the model
-====================
+# Projecting the model
 
-Now we have one model (`ab_m`) telling us how land-use change influences the total abundance of species and one model (`cs_m`) that tells us what proportion of those individuals are from 'originally present species' in a community. Multiplying these together gives us the BII: the abundance of originally present species. We do this by projecting abundance and compositional similarity onto rasters of pressure data, and then multiplying the two output maps together.
+Now we have one model (`ab_m`) telling us how land-use change influences
+the total abundance of species and one model (`cs_m`) that tells us what
+proportion of those individuals are from ‘originally present species’ in
+a community. Multiplying these together gives us the BII: the abundance
+of originally present species. We do this by projecting abundance and
+compositional similarity onto rasters of pressure data, and then
+multiplying the two output maps together.
 
-Model predictions
------------------
+## Model predictions
 
-First of all, let's calculate the actual diversity in each land-use class, ignoring the impact of random effects (see `help(predict.merMod)` for more details on this).
+First of all, let’s use the models to predict the abundance and
+compositional similarity in each land-use class, ignoring the impact of
+random effects (see `help(predict.merMod)` for more details on this).
 
 ``` r
 # let's start with the abundance model
@@ -682,31 +832,58 @@ newdata_cd <- data.frame(Contrast = levels(cd_data$Contrast),
            inv_logit(a = 0.001))
 ```
 
-It's these *predicted* values (`ab_m_preds` and `cd_m_preds`) that we're going to use to calculate the diversity in each cell of a land-use map. We will multiply the predicted diversity in each land-use class with the area of the cell in that land-use class. However, because we have a mixed effects model, the *absolulte* value of diversity is somewhat meaningless. Instead, we care about the *relative* diversity - how much diversity is there relative to what we'd find if the whole landscape was still minimally-used primary vegetation. So once we have the predictions, we divide by the reference value (the predicted diversity in minimally-used primary vegetation for the whole cell).
+It’s these *predicted* values (`ab_m_preds` and `cd_m_preds`) that we’re
+going to use. We will multiply the predicted abundance and compositional
+similarity in each land-use class with the area of the cell in that
+land-use class. However, because we have a mixed effects model, the
+*absolute* values are somewhat meaningless. Instead, we care about the
+*relative* values - what is the abundance or compositional similarity
+*relative* to what we’d find if the whole landscape was still
+minimally-used primary vegetation. So once we have the predictions, we
+divide by the reference value (the predicted abundance or compositional
+similarity in minimally-used primary vegetation for the whole cell).
 
-Gather land-use rasters
------------------------
+## Gather land-use rasters
 
-You can use any land-use data you like, but many land-use maps don't have classes that map easily onto the definitions used by PREDICTS. Noteable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>) and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
+You can use any land-use data you like, but many land-use maps don’t
+have classes that map easily onto the definitions used by PREDICTS.
+Notable exceptions are land-use maps developed for the Representative
+Concentration Pathways
+(<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>),
+because PREDICTS land-use classes were designed with these maps in mind,
+and the derived fine-resolution product developed by
+<a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
 
-I'm just going to simulate some rasters here for ease.
+I’m just going to simulate some rasters here for ease.
 
-We've got seven land-use classes. Imagine we have seven rasters, one for each land-use class, and the cell value is the proportion of the cell assigned to that land-use class. We'll generate some random numbers for each of the land uses - let's make it mostly cropland, with a fair chunk of pasture and secondary vegetation, with just patches of natural land and urban areas.
+We’ve got seven land-use classes. Imagine we have seven rasters, one for
+each land-use class, and the cell value is the proportion of the cell
+assigned to that land-use class. We’ll generate some random numbers for
+each of the land uses - let’s make it mostly cropland, with a fair chunk
+of pasture and secondary vegetation, with just patches of natural land
+and urban
+areas.
 
 ``` r
 # generate a dataframe with random numbers for the cell values for each land-use class
-lus <- data.frame(pri_min = rnorm(25, mean = 50, sd = 1),
+lus <- data.frame(pri_min = rnorm(25, mean = 50, sd = 25),
                   pri = rnorm(25, mean = 100, sd = 25),
                   plant = rnorm(25, mean = 100, sd = 25),
                   sec = rnorm(25, mean = 300, sd = 25),
                   crop = rnorm(25, mean = 1000, sd = 25),
                   pas = rnorm(25, mean = 400, sd = 25),
-                  urb = rnorm(25, mean = 50, sd = 1)
-                  ) %>%
+                  urb = rnorm(25, mean = 50, sd = 25)
+                  )
+
+# let's artificially make the first cell dominated by urban land and the last cell dominated by minimally-used primary vegetation
+lus$urb[1] <- 2000
+lus$pri_min[25] <- 2000
+
+lus <- lus %>%
   # calculate the row totals
   mutate(tot = rowSums(.)) %>%
   
-  # for each land use, divide the value by the rowsum
+  # now, for each land use, divide the value by the rowsum
   # this will give us the proportion of each land use in each cell
   transmute_at(1:7, funs(./tot))
 
@@ -736,10 +913,21 @@ for(i in 1:ncol(lus)){
 }
 ```
 
-Spatial projections of BII
---------------------------
+For example, here’s the raster showing the amount of urban land in each
+cell:
 
-Calculate the output rasters for abundance (`ab_raster`) and compositional similarity (`cd_raster`) by multiplying the predictions for each land-use class by the amount of that land-use class in the cell.
+``` r
+plot(urb_raster)
+```
+
+![](bii_example_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+## Spatial projections of BII
+
+Calculate the output rasters for abundance (`ab_raster`) and
+compositional similarity (`cd_raster`) by multiplying the predictions
+for each land-use class by the amount of that land-use class in the
+cell.
 
 ``` r
 ab_raster <- (newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary minimal'] * pri_min_raster + 
@@ -766,34 +954,89 @@ cd_raster <- (newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Prim
   newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary minimal']
 ```
 
-The final step is to multiply the abundance and compositional similarity rasters together. We'll also multiply the values by 100 so that BII is expressed as a percentage rather than a proportion.
+The final step is to multiply the abundance and compositional similarity
+rasters together. We’ll also multiply the values by 100 so that BII is
+expressed as a percentage rather than a proportion.
 
 ``` r
 bii <- ab_raster * cd_raster
 plot(bii * 100)
 ```
 
-![](bii_example_files/figure-markdown_github/unnamed-chunk-15-1.png)
+![](bii_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
-And that is it. A quick walkthrough of how we use the PREDICTS database to model and project the Biodiversity Intactness Index.
+Once you have your map of BII, you can calculate the average value
+across any spatial scale. The average BII across this map is 81.03.
 
-Extensions
-==========
+And that is it. A quick walkthrough of how we use the PREDICTS database
+to model and project the Biodiversity Intactness Index.
 
--   The model framework is pretty flexible, so you can incorporate additional human pressures (like human population density and road density) into the statistical models of both abundance and compositional similarity.
--   If you'd like to *weight* your maps of BII, you can also multiply the outputs by additional layers, such as NPP, to give more weight to naturally more diverse areas.
--   If you have pressure data across time as well as space, you can look at temporal changes in BII (assuming that responses to pressures are the same across these time periods).
+# Extensions
 
-Advantages
-==========
+  - The model framework is pretty flexible, so you can incorporate
+    additional human pressures (like human population density and road
+    density) into the statistical models of both abundance and
+    compositional similarity.
+  - If you’d like to *weight* your maps of BII, you can also multiply
+    the outputs by additional layers, such as NPP, to give more weight
+    to naturally more productive or more diverse areas.
+  - If you have pressure data across time as well as space, you can look
+    at temporal changes in BII (assuming that responses to pressures are
+    the same across these time periods).
 
--   BII is empirically derived from a transparent database.
--   BII has been proposed as an indicator useful in assessing whether we have transgressed Planetary Boundaries.
--   Because we are mapping *local* diversity here, you can also average the map across any spatial scale.
+## Validation
 
-Limitations
-===========
+Four approaches have been used to validate PREDICTS’ models and
+estimates of BII.
 
-Hopefully it goes without saying, but the uncertainty in the BII map will depend on its inputs, both in terms of the statistical models and the geospatial data used for projections. The higher the uncertainty in these aspects, the higher the uncertainty in the BII projections. Although land-use mapping is continually advancing, there are still limitations. So using a global map and then drilling down into a single pixel is not really advisable. Instead, the maps are more likely to be reliable when looking over broader areas and larger time steps, rather than pixel by pixel and year by year.
+1.  Jack-knifing has been used to assess whether any parameter estimates
+    are unduly sensitive to particular individual studies (e.g., this
+    paper).
+2.  Cross-validation has been used to assess the robustness of parameter
+    estimates. For example, this paper fitted models leaving out each
+    biome in turn, ensuring that the global model was not driven by
+    extreme estimates for any particular biome.
+3.  We have tested whether model parameters differ significantly among
+    regions or taxonomic groups by testing for region x pressure or
+    group x pressure interactions, e.g., this paper and this paper.
+4.  One paper collected field data on birds at sites in Tanzania and
+    Kenya, and compared an Africa-wide PREDICTS biodiversity model with
+    a bird model based on the independent field data.
 
-BII is a measure of ecosystem intactness, but we do not expect it to be used in isolation. There are myriad biodiversity metrics and indices out there, and which one you use will depend on what is most important/interesting/relevant to you and your system. BII is just one metric, but can complement others, such as indicators based on extinction risk and population decline.
+A key assumption of our method for calculating BII is that species in
+minimally-used primary vegetation are *native* species. This is not
+always true, but we can’t always identify which species are native or
+alien in the PREDICTS database. For island communities where we can
+distinguish native species from alien species, we are working to compare
+BII as calculated above (with an abundance model and compositional
+similarity model) with BII modeled as the abundance of native species
+only (with an abundance model of *only* native species).
+
+# Advantages
+
+  - BII is empirically derived from a transparent database.
+  - BII has been proposed as an indicator useful in assessing whether we
+    have transgressed Planetary Boundaries.
+  - Because BII is an indicator of local biodiversity, you can simply
+    average it across all the pixels in a region to get a summary of the
+    average state of local biodiversity for that region.
+
+# Limitations
+
+Hopefully it goes without saying, but the uncertainty in the BII map
+will depend on its inputs, both in terms of the statistical models and
+the geospatial data used for projections. The higher the uncertainty in
+these aspects, the higher the uncertainty in the BII projections.
+Although land-use mapping is continually advancing, there are still
+limitations. So using a global map and then drilling down into a single
+pixel is not really advisable. Instead, the maps are more likely to be
+reliable when looking over broader areas and larger time steps, rather
+than pixel by pixel and year by year.
+
+BII is a measure of ecosystem intactness, but we do not expect it to be
+used in isolation. There are myriad biodiversity metrics and indices out
+there, and which one you use will depend on what is most
+important/interesting/relevant to you and your system. [BII is just one
+metric, but can complement
+others](https://www.nature.com/articles/s41893-018-0130-0), such as
+indicators based on extinction risk and population decline.
