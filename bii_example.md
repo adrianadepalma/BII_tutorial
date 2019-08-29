@@ -1,7 +1,7 @@
 Calculating the Biodiversity Intactness Index
 ================
-Adriana De Palma
-16 July, 2019
+Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis
+29 August, 2019
 
   - [About PREDICTS](#about-predicts)
   - [About BII](#about-bii)
@@ -21,6 +21,11 @@ Adriana De Palma
       - [Validation](#validation)
   - [Advantages](#advantages)
   - [Limitations](#limitations)
+      - [Assumptions of PREDICTS](#assumptions-of-predicts)
+      - [Uncertainty](#uncertainty)
+      - [BII is a valuable metric, but isn’t the only
+        answer](#bii-is-a-valuable-metric-but-isnt-the-only-answer)
+  - [R Info](#r-info)
 
 This tutorial gives a step-by-step guide on how to calculate the
 Biodiversity Intactness Index (BII) using the PREDICTS database. We’ll
@@ -33,8 +38,8 @@ with.
 
 <details>
 
-<summary>[PREDICTS](https://www.predicts.org.uk/) - Projecting Responses
-of Ecological Diversity In Changing Terrestrial Systems - is a
+<summary>[PREDICTS](https://www.predicts.org.uk/) – Projecting Responses
+of Ecological Diversity In Changing Terrestrial Systems – is a
 collaboration that aims to model how local terrestrial biodiversity
 worldwide responds to land use and related pressures, and to use such
 models to project how biodiversity may change under future socioeconomic
@@ -51,8 +56,8 @@ the same way. Each site’s land use and land-use intensity has been
 classified into a consistent set of categories, based on information in
 the paper or from the authors, and some other human pressures (e.g.,
 human population density) are estimated for each site from global
-rasters. Details of how the database was put together - including
-definitions of our land-use and use-intensity classes - can be found in
+rasters. Details of how the database was put together – including
+definitions of our land-use and use-intensity classes – can be found in
 [this
 paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303); the
 first released version of the database is available from the [Natural
@@ -134,7 +139,7 @@ initially [estimated](https://www.nature.com/articles/nature03289) using
 carefully-structured expert opinion. The PREDICTS team [first estimated
 BII based on primary biodiversity data
 in 2016](https://science.sciencemag.org/content/353/6296/288), by
-combining two statistical models - one of site-level organismal
+combining two statistical models – one of site-level organismal
 abundance, and one of compositional similarity to a site still having
 primary vegetation. The latter model was needed to account for the fact
 that models of overall organismal abundance do not consider turnover in
@@ -291,11 +296,11 @@ glimpse(diversity)
 describes the PREDICTS database structure and content. Briefly, the
 database consists of a number of different sources (journal articles),
 `Source_ID` in the database, within which there can be multiple studies
-(`Study_name` and `Study_number`). Within each studies, there are
-multiple sites (`Site_name` and `Site_number`) within blocks (`Block`).
-For ease, we use the combined, shorthand values for these: `SS` (Study
-number and Source), `SSB` (`SS` and Block) and `SSBS` (`SSB` and site
-number).
+(`Study_name` and `Study_number`). Within each study, there are multiple
+sites (`Site_name` and `Site_number`) within blocks (`Block`). For ease,
+we use the combined, shorthand values for these: `SS` (`Study_number`
+and `Source_ID`), `SSB` (`SS` and `Block`) and `SSBS` (`SSB`
+and`Site_number`).
 
 Now let’s explore the data a little.
 
@@ -404,6 +409,19 @@ abundance_data <- diversity %>%
   # now rescale total abundance, so that within each study, abundance varies from 0 to 1.
   mutate(RescaledAbundance = TotalAbundance/MaxAbundance)
 ```
+
+Note that here we are using the `Effort_corrected_measurement`. For some
+studies, the sampling effort (but not the method) can vary slightly
+among sites. To account for this, we assume that abundance increases
+linearly with sampling effort (validated
+[here](https://www.nature.com/articles/srep31153)) – i.e., the abundance
+measurement is divided by the sampling effort so that it is transformed
+to abundance per unit effort. This is ok for modelling total abundance,
+but we can’t account for how the *identity* or *number* of species
+varies with sampling effort in the same simple way. So in the next stage
+where species identity matters, you’ll see that we’re using the
+`Measurement` field (raw reported abundance), and will only use studies
+where the sampling effort does not vary among sites.
 
 ## Compositional Similarity
 
@@ -625,10 +643,10 @@ registerDoSEQ()
 # Run the statistical analysis
 
 In the PREDICTS database, most of the variation in diversity is going to
-be between Studies - each study looks at different groups in different
-areas using different sampling methods. This has to be accounted for in
-the statistical analysis. We do this in a mixed effects framework: we
-treat studies and blocks as random effects.
+be between Studies – each study looks at different species groups in
+different areas using different sampling methods. This has to be
+accounted for in the statistical analysis. We do this in a mixed effects
+framework: we treat studies and blocks as random effects.
 
 ## Total Abundance
 
@@ -636,14 +654,14 @@ Let’s start with a simple model of total abundance. Note that the errors
 in models of ecological abundance are generally non-normal. Usually, we
 would deal with that by modelling abundance with an error structure,
 such as poisson or quasipoisson. However, in the PREDICTS database, we
-take quite a broad view of what counts as an ‘abundance’ measurement -
+take quite a broad view of what counts as an ‘abundance’ measurement –
 they are not all whole individuals so they aren’t whole numbers (e.g.,
 they might be expressed as average numbers per square metre). The `lme4`
 package doesn’t really like you using a discrete error structure with
 continuous data. So instead, we must transform the data. Generally, a
 log-transformation does well, but in some cases, a square-root
 transformation helps to normalise the errors. *I’m not going to go
-through model checking with you here - this is all just to give you an
+through model checking with you here – this is all just to give you an
 idea of how to model BII, not how to do statistical analysis… Please
 check your residual plots etc before using models to make inferences and
 spatial projections\!*
@@ -705,7 +723,7 @@ with distance. You can also include environmental distance (we’ve done
 this previously based on Gower’s dissimilarity of climatic variables)
 and additional human pressures in models like this.
 
-The compositional similarity measure we use is bounded between 0 and 1 -
+The compositional similarity measure we use is bounded between 0 and 1 –
 this means the errors will probably not be normally distributed.
 Although log-transformation produced models with acceptable diagnostics,
 it doesn’t respect the boundedness of the compositional similarity
@@ -837,11 +855,11 @@ going to use. We will multiply the predicted abundance and compositional
 similarity in each land-use class with the area of the cell in that
 land-use class. However, because we have a mixed effects model, the
 *absolute* values are somewhat meaningless. Instead, we care about the
-*relative* values - what is the abundance or compositional similarity
+*relative* values – what is the abundance or compositional similarity
 *relative* to what we’d find if the whole landscape was still
 minimally-used primary vegetation. So once we have the predictions, we
 divide by the reference value (the predicted abundance or compositional
-similarity in minimally-used primary vegetation for the whole cell).
+similarity if the whole cell was minimally-used primary vegetation).
 
 ## Gather land-use rasters
 
@@ -859,7 +877,7 @@ I’m just going to simulate some rasters here for ease.
 We’ve got seven land-use classes. Imagine we have seven rasters, one for
 each land-use class, and the cell value is the proportion of the cell
 assigned to that land-use class. We’ll generate some random numbers for
-each of the land uses - let’s make it mostly cropland, with a fair chunk
+each of the land uses – let’s make it mostly cropland, with a fair chunk
 of pasture and secondary vegetation, with just patches of natural land
 and urban
 areas.
@@ -885,7 +903,7 @@ lus <- lus %>%
   
   # now, for each land use, divide the value by the rowsum
   # this will give us the proportion of each land use in each cell
-  transmute_at(1:7, funs(./tot))
+  transmute_at(1:7, list(~ ./tot))
 
 # double check that the proportions of each land use sum to 1 (accounting for rounding errors)
 all(zapsmall(rowSums(lus)) == 1)
@@ -893,7 +911,7 @@ all(zapsmall(rowSums(lus)) == 1)
 
     ## [1] TRUE
 
-Now turn each land use into its own 5 x 5 raster.
+Now turn each land use into its own 5 \(\times\) 5 raster.
 
 ``` r
 # for each column of lus (i.e., each land use)
@@ -966,7 +984,7 @@ plot(bii * 100)
 ![](bii_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 Once you have your map of BII, you can calculate the average value
-across any spatial scale. The average BII across this map is 81.03.
+across any spatial scale. The average BII across this map is 80.99.
 
 And that is it. A quick walkthrough of how we use the PREDICTS database
 to model and project the Biodiversity Intactness Index.
@@ -990,18 +1008,23 @@ Four approaches have been used to validate PREDICTS’ models and
 estimates of BII.
 
 1.  Jack-knifing has been used to assess whether any parameter estimates
-    are unduly sensitive to particular individual studies (e.g., this
-    paper).
+    are unduly sensitive to particular individual studies (e.g. [this
+    paper](https://onlinelibrary.wiley.com/doi/full/10.1111/ddi.12478)).
 2.  Cross-validation has been used to assess the robustness of parameter
-    estimates. For example, this paper fitted models leaving out each
-    biome in turn, ensuring that the global model was not driven by
-    extreme estimates for any particular biome.
+    estimates. For example, [this
+    paper](https://www.nature.com/articles/nature14324) fitted models
+    leaving out each biome in turn, ensuring that the global model was
+    not driven by extreme estimates for any particular biome.
 3.  We have tested whether model parameters differ significantly among
-    regions or taxonomic groups by testing for region x pressure or
-    group x pressure interactions, e.g., this paper and this paper.
-4.  One paper collected field data on birds at sites in Tanzania and
-    Kenya, and compared an Africa-wide PREDICTS biodiversity model with
-    a bird model based on the independent field data.
+    regions or taxonomic groups by testing for region \(\times\)
+    pressure or group \(\times\) pressure interactions, e.g., [this
+    paper](https://www.nature.com/articles/srep31153) and [this
+    paper](https://link.springer.com/article/10.1007/s10531-017-1356-2).
+4.  [One
+    paper](https://zslpublications.onlinelibrary.wiley.com/doi/full/10.1111/acv.12327)
+    collected field data on birds at sites in Tanzania and Kenya, and
+    compared an Africa-wide PREDICTS biodiversity model with a bird
+    model based on the independent field data.
 
 A key assumption of our method for calculating BII is that species in
 minimally-used primary vegetation are *native* species. This is not
@@ -1023,6 +1046,43 @@ only (with an abundance model of *only* native species).
 
 # Limitations
 
+## Assumptions of PREDICTS
+
+There are some inherent assumptions in PREDICTS that we’ve mentioned
+previously both in this document and in our papers. Firstly, we assume
+that differences in biodiversity among matched sites with different land
+uses are caused by the land-use difference. This is a form of
+space-for-time substitution. In reality, it can take centuries for the
+full impact of a land-use change to be seen in the ecological community;
+in the models we’ve shown you above, we’ve assumed that the sites are at
+their ‘equilibrium’ level of biodiversity so the full impact of land-use
+change has already been felt. This won’t always be true. For secondary
+vegetation sites, we can at least *try* to account for this by including
+the broad ages of secondary vegetation. Ideally, we would use
+time-series data to model biodiversity changes in response to land-use
+change, but such surveys also have their own limitations that would
+likely limit our ability to produce global models underpinned by
+geographically and taxonomically representative data ([see
+here](https://www.sciencedirect.com/science/article/pii/S0065250417300296)
+for a discussion of different data types and their advantages and
+limitations). However, we’ve been working on a database and modelling
+framework to attempt to validate our assumptions.
+
+Secondly, the models presented in this walkthrough assume that the biota
+at sites with minimally-used primary vegetation approximates their
+pristine biota, when in reality, truly intact land is rare. It is likely
+that many of the primary vegetations sites (even those that are
+minimally used) will have had species filtered out by past disturbances
+or will have experienced compositional changes due to disturbances in
+the surrounding areas. We can try to account for additional pressures
+affecting sites by including more variables in the models (e.g., human
+population density and distance to the nearest road or road density).
+However, we do not have *true* baseline sites with which we can make
+biodiversity comparisons, because we don’t have representative long-term
+data.
+
+## Uncertainty
+
 Hopefully it goes without saying, but the uncertainty in the BII map
 will depend on its inputs, both in terms of the statistical models and
 the geospatial data used for projections. The higher the uncertainty in
@@ -1033,6 +1093,8 @@ pixel is not really advisable. Instead, the maps are more likely to be
 reliable when looking over broader areas and larger time steps, rather
 than pixel by pixel and year by year.
 
+## BII is a valuable metric, but isn’t the only answer
+
 BII is a measure of ecosystem intactness, but we do not expect it to be
 used in isolation. There are myriad biodiversity metrics and indices out
 there, and which one you use will depend on what is most
@@ -1040,3 +1102,52 @@ important/interesting/relevant to you and your system. [BII is just one
 metric, but can complement
 others](https://www.nature.com/articles/s41893-018-0130-0), such as
 indicators based on extinction risk and population decline.
+
+# R Info
+
+``` r
+utils::sessionInfo()
+```
+
+    ## R version 3.6.1 (2019-07-05)
+    ## Platform: x86_64-w64-mingw32/x64 (64-bit)
+    ## Running under: Windows 7 x64 (build 7601) Service Pack 1
+    ## 
+    ## Matrix products: default
+    ## 
+    ## locale:
+    ## [1] LC_COLLATE=English_United Kingdom.1252 
+    ## [2] LC_CTYPE=English_United Kingdom.1252   
+    ## [3] LC_MONETARY=English_United Kingdom.1252
+    ## [4] LC_NUMERIC=C                           
+    ## [5] LC_TIME=English_United Kingdom.1252    
+    ## 
+    ## attached base packages:
+    ## [1] parallel  stats     graphics  grDevices utils     datasets  methods  
+    ## [8] base     
+    ## 
+    ## other attached packages:
+    ##  [1] doParallel_1.0.15 iterators_1.0.12  foreach_1.4.7    
+    ##  [4] geosphere_1.5-10  raster_3.0-2      sp_1.3-1         
+    ##  [7] car_3.0-3         carData_3.0-2     lme4_1.1-21      
+    ## [10] Matrix_1.2-17     magrittr_1.5      tidyr_0.8.3      
+    ## [13] dplyr_0.8.3      
+    ## 
+    ## loaded via a namespace (and not attached):
+    ##  [1] tidyselect_0.2.5  xfun_0.9          purrr_0.3.2      
+    ##  [4] splines_3.6.1     haven_2.1.1       lattice_0.20-38  
+    ##  [7] vctrs_0.2.0       htmltools_0.3.6   yaml_2.2.0       
+    ## [10] utf8_1.1.4        rlang_0.4.0       nloptr_1.2.1     
+    ## [13] pillar_1.4.2      foreign_0.8-71    glue_1.3.1       
+    ## [16] readxl_1.3.1      stringr_1.4.0     cellranger_1.1.0 
+    ## [19] zip_2.0.3         codetools_0.2-16  evaluate_0.14    
+    ## [22] knitr_1.24        rio_0.5.16        forcats_0.4.0    
+    ## [25] curl_4.0          fansi_0.4.0       Rcpp_1.0.2       
+    ## [28] backports_1.1.4   abind_1.4-5       hms_0.5.1        
+    ## [31] digest_0.6.20     stringi_1.4.3     openxlsx_4.1.0.1 
+    ## [34] grid_3.6.1        cli_1.1.0         tools_3.6.1      
+    ## [37] tibble_2.1.3      crayon_1.3.4      pkgconfig_2.0.2  
+    ## [40] zeallot_0.1.0     MASS_7.3-51.4     data.table_1.12.2
+    ## [43] assertthat_0.2.1  minqa_1.2.4       rmarkdown_1.15   
+    ## [46] R6_2.4.0          boot_1.3-22       nlme_3.1-140     
+    ## [49] compiler_3.6.1
