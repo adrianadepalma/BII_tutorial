@@ -598,6 +598,9 @@ utils::sessionInfo()
 ```
 
 
+# Acknowledgements
+Many thanks to the PREDICTS team, collaborators and data contributors. This work has been supported by the Natural Environment Research Council (NE/M014533/1), the National Council of Science & Technology of Mexico (CONACyT) and the Prince Albert II of Monaco Foundation.
 
-
+# How to cite
+De Palma A., Sanchez-Ortiz K. & Purvis A. (2019) Calculating the Biodiversity Intactness Index: the PREDICTS implementation. doi: 10.5281/zenodo.3518067
 

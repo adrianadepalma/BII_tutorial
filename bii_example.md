@@ -1,7 +1,7 @@
 Calculating the Biodiversity Intactness Index
 ================
 Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis
-29 August, 2019
+24 October, 2019
 
   - [About PREDICTS](#about-predicts)
   - [About BII](#about-bii)
@@ -26,6 +26,8 @@ Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis
       - [BII is a valuable metric, but isn’t the only
         answer](#bii-is-a-valuable-metric-but-isnt-the-only-answer)
   - [R Info](#r-info)
+  - [Acknowledgements](#acknowledgements)
+  - [How to cite](#how-to-cite)
 
 This tutorial gives a step-by-step guide on how to calculate the
 Biodiversity Intactness Index (BII) using the PREDICTS database. We’ll
@@ -984,7 +986,7 @@ plot(bii * 100)
 ![](bii_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 Once you have your map of BII, you can calculate the average value
-across any spatial scale. The average BII across this map is 80.99.
+across any spatial scale. The average BII across this map is 81.14.
 
 And that is it. A quick walkthrough of how we use the PREDICTS database
 to model and project the Biodiversity Intactness Index.
@@ -1151,3 +1153,16 @@ utils::sessionInfo()
     ## [43] assertthat_0.2.1  minqa_1.2.4       rmarkdown_1.15   
     ## [46] R6_2.4.0          boot_1.3-22       nlme_3.1-140     
     ## [49] compiler_3.6.1
+
+# Acknowledgements
+
+Many thanks to the PREDICTS team, collaborators and data contributors.
+This work has been supported by the Natural Environment Research Council
+(NE/M014533/1), the National Council of Science & Technology of Mexico
+(CONACyT) and the Prince Albert II of Monaco Foundation.
+
+# How to cite
+
+De Palma A., Sanchez-Ortiz K. & Purvis A. (2019) Calculating the
+Biodiversity Intactness Index: the PREDICTS implementation. doi:
+10.5281/zenodo.3518067
