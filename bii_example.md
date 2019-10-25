@@ -1,4 +1,5 @@
-Calculating the Biodiversity Intactness Index
+Calculating the Biodiversity Intactness Index: the PREDICTS
+implementation
 ================
 Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis
 24 October, 2019
@@ -986,7 +987,7 @@ plot(bii * 100)
 ![](bii_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 Once you have your map of BII, you can calculate the average value
-across any spatial scale. The average BII across this map is 81.14.
+across any spatial scale. The average BII across this map is 80.89.
 
 And that is it. A quick walkthrough of how we use the PREDICTS database
 to model and project the Biodiversity Intactness Index.
