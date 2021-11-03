@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
 
 <meta charset="utf-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis" />
+<meta name="author" content="Adriana De Palma, Katia Sanchez-Ortiz, Helen R.P. Phillips and Andy Purvis" />
 
 
 <title>Calculating the Biodiversity Intactness Index: the PREDICTS implementation</title>
@@ -1417,6 +1416,7 @@ summary {
   border: none;
   display: inline-block;
   border-radius: 4px;
+  background-color: transparent;
 }
 
 .tabset-dropdown > .nav-tabs.nav-tabs-open > li {
@@ -1445,6 +1445,12 @@ summary {
 }
 }
 
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
 
 .toc-content {
   padding-left: 30px;
@@ -1516,20 +1522,21 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Calculating the Biodiversity Intactness Index: the PREDICTS implementation</h1>
-<h4 class="author">Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis</h4>
-<h4 class="date">24 October, 2019</h4>
+<h4 class="author">Adriana De Palma, Katia Sanchez-Ortiz, Helen R.P. Phillips and Andy Purvis</h4>
+<h4 class="date">03 November, 2021</h4>
 
 </div>
 
 
 <p>This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We’ll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII, using <code>R</code>. We’ll be using just a subset of the data and a very simple model to start with.</p>
+<p>You can explore the results from our most up-to-date global models on the Natural History Museum’s <a href="https://www.nhm.ac.uk/our-science/data/biodiversity-indicators/biodiversity-intactness-index-data?future-scenario=ssp2_rcp4p5_message_globiom&amp;georegion=001&amp;min-year=1970&amp;max-year=2050&amp;georegion-compare=null&amp;show-uncertainty=true" target="_blank">Biodiversity Trends Explorer</a>. This online tool allows users to explore historical and potential future trends in BII for different geographic units (e.g., countries, regions, global).</p>
 <div id="about-predicts" class="section level1">
 <h1>About PREDICTS</h1>
 <details>
 <p><summary><a href="https://www.predicts.org.uk/" target="_blank">PREDICTS</a> – Projecting Responses of Ecological Diversity In Changing Terrestrial Systems – is a collaboration that aims to model how local terrestrial biodiversity worldwide responds to land use and related pressures, and to use such models to project how biodiversity may change under future socioeconomic scenarios. <em>Expand to learn more</em> </summary>The PREDICTS team have collated a large database of biodiversity data from over 29,000 sites worldwide. These data have been provided by authors of over 700 separate surveys, each of which sampled biodiversity at multiple sites facing different land-use and related pressures. Although the different surveys have used a very wide range of different techniques, and focused on a wide array of different plant, fungal, invertebrate or vertebrate taxa (the database now holds data from over 50,000 species), the data from different sites within a survey are comparable, having been collected in the same way. Each site’s land use and land-use intensity has been classified into a consistent set of categories, based on information in the paper or from the authors, and some other human pressures (e.g., human population density) are estimated for each site from global rasters. Details of how the database was put together – including definitions of our land-use and use-intensity classes – can be found in <a href="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303" target="_blank">this paper</a>; the first released version of the database is available from the <a href="https://data.nhm.ac.uk/" target="_blank">Natural History Museum’s data portal</a>, and is described in <a href="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.2579" target="_blank">this paper</a>.</p>
 <p>Because the database holds the original biodiversity data, statistical analysis can model a wide range of response variables (as explained in <a href="https://www.sciencedirect.com/science/article/pii/S0065250417300284" target="_blank">this paper</a>), including site-level measures of diversity (such as <a href="https://www.nature.com/articles/nature14324" target="_blank">within-sample species richness, rarefaction-based richness or overall organismal abundance</a>), <a href="https://onlinelibrary.wiley.com/doi/full/10.1111/ecog.01932" target="_blank">among-site differences in community composition</a>, or <a href="https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2664.12524" target="_blank">the occurrence and/or population size of each species</a>. Combining our data with other species-level information permits modelling of <a href="https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638" target="_blank">functional and phylogenetic diversity</a> or of <a href="https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.2006841" target="_blank">a community-weighted measure of geographic range size</a>. This walkthrough document focuses on modelling two response variables: total site-level abundance, and compositional similarity between sites.</p>
 <p>Because the surveys in the database arise from such very different methodologies, we fit mixed-effects models with survey-level random effects, allowing us to focus on how human pressures affect the response variable while acknowledging the among-survey heterogeneity. We assume that biotic differences among matched sites with different land uses are caused by the land-use difference, a form of space-for-time substitution. Some of our models also assume that the biota at sites with minimally-used primary vegetation (and minimal levels of other pressures) approximates their pristine biota. These assumptions would not be needed if representative long-term temporal data were available.</p>
-Models can be fitted to the whole global data or to regions of particular interest (such as <a href="https://www.biorxiv.org/content/10.1101/311688v3" target="_blank">tropical and subtropical forest biomes</a>). The models can be combined with detailed spatiotemporal data on the pressures <a href="https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638" target="_blank">to map the projected current state of the response variable</a>, <a href="https://www.biorxiv.org/content/10.1101/311688v3" target="_blank">estimate how it has changed in the past</a>, or <a href="https://www.biorxiv.org/content/10.1101/311787v1" target="_blank">project its future under alternative scenarios</a>.
+Models can be fitted to the whole global data or to regions of particular interest (such as <a href="https://www.nature.com/articles/s41598-021-98811-1" target="_blank">tropical and subtropical forest biomes</a>). The models can be combined with detailed spatiotemporal data on the pressures <a href="https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638" target="_blank">to map the projected current state of the response variable</a>, <a href="https://www.nature.com/articles/s41598-021-98811-1" target="_blank">estimate how it has changed in the past</a>, or <a href="https://www.biorxiv.org/content/10.1101/311787v1" target="_blank">project its future under alternative scenarios</a>.
 </details>
 </div>
 <div id="about-bii" class="section level1">
@@ -1538,30 +1545,34 @@ Models can be fitted to the whole global data or to regions of particular intere
 <p><summary>The Biodiversity Intactness Index (BII) was initially <a href="https://www.nature.com/articles/nature03289" target="_blank">proposed in 2005</a> as a sound, sensitive, easily understood and affordable biodiversity indicator that could easily be applied at any spatial scale and would allow for comparison with a policy target and a baseline. BII is defined as the average abundance, across a large and functionally diverse set of species, relative to their reference populations (which would ideally be populations before any impacts of modern industrial society, but which practically have to be populations in the least impacted settings available); non-native species are excluded from the calculation. <em>Expand to learn more</em></summary></p>
 <p>BII became more prominent with its adoption in the <a href="https://science.sciencemag.org/content/347/6223/1259855" target="_blank">2015 revision of the Planetary Boundaries framework</a> as an interim measure of biosphere integrity. The framework proposed that reduction of average BII to below 90% across a large region such as a biome would risk large-scale disruption of the flow of ecosystem services and jeopardise sustainable development, though the paper acknowledged that the precise placement of the ‘safe limit’ for BII was very uncertain.</p>
 <p>In the absence of sufficient collated biodiversity data, BII was initially <a href="https://www.nature.com/articles/nature03289" target="_blank">estimated</a> using carefully-structured expert opinion. The PREDICTS team <a href="https://science.sciencemag.org/content/353/6296/288" target="_blank">first estimated BII based on primary biodiversity data in 2016</a>, by combining two statistical models – one of site-level organismal abundance, and one of compositional similarity to a site still having primary vegetation. The latter model was needed to account for the fact that models of overall organismal abundance do not consider turnover in species composition. Although we gave several reasons why our estimates of BII were likely to be overoptimistic, our 2016 estimates nonetheless placed the world, nearly all biomes and nearly all biodiversity hotspots below the proposed ‘safe limit’ for BII.</p>
-<p>We have <a href="https://www.biorxiv.org/content/10.1101/311688v3" target="_blank">continued to refine the modelling framework to improve our estimates of BII</a>. The most important improvements since the 2016 paper have been:</p>
+<p>We have <a href="https://www.nature.com/articles/s41598-021-98811-1" target="_blank">continued to refine the modelling framework to improve our estimates of BII</a>. The most important improvements since the 2016 paper have been:</p>
 <ul>
-<li>Use of a more stringent baseline in models of compositional similarity. Whereas the 2016 paper used all primary vegetation sites (even those with intense human use) as the baseline land use, growth of the database and a switch to a more efficient (matrix-based) model framework have allowed us to use only minimally-used primary vegetation as the baseline.</li>
+<li>Use of a more stringent baseline in models of compositional similarity. Whereas the 2016 paper used all primary vegetation sites (even those with intense human use) as the baseline land use, growth of the database and a switch to a more efficient (matrix-based) model framework have allowed us to use a more suitable baseline. Depending on the analysis, this could include only minimally-used primary vegetation as the baseline, or it could include a mixture of minimally- and lightly-used primary vegetation as well as minimally-used mature secondary vegetation.</li>
 <li>A more principled transformation of the compositional similarity estimates prior to modelling. Although the log-transformation used in the 2016 paper produced acceptable model diagnostics, it does not recognise the bounded nature of compositional similarity (which can range from 0 to 1). We now use a logit transformation instead, which provides more sensitive discrimination among land uses.</li>
 </ul>
-<p>The estimates of BII that result from the improved framework tend to be <a href="https://www.nature.com/articles/s41559-019-0896-0" target="_blank">markedly lower than those we obtained in 2016</a>. One issue that remains to be addressed is that the land-use rasters we have been using to make spatial projections do not differentiate planted from natural forest, meaning our estimates are still likely to be too high in regions with extensive planted forest. Work to address this shortcoming is underway.</p>
-BII, being an indicator of the average state of local ecological communities, complements indicators based on species’ global conservation status (such as the Red List Index), or on population trends (such as the Living Planet Index). These different facets of biodiversity are all important, and <a href="https://www.nature.com/articles/s41893-018-0130-0" target="_blank">can be combined to provide a roadmap towards restoring global biodiversity</a>.
+<p>The estimates of BII that result from the improved framework tend to be <a href="https://www.nature.com/articles/s41559-019-0896-0" target="_blank">markedly lower than those we obtained in 2016</a>. One issue that remains to be addressed is that the land-use rasters we have been using to make spatial projections do not accurately differentiate planted from natural forest, meaning our estimates are still likely to be too high in regions with extensive planted forest. Work to address this shortcoming is underway.</p>
+<p>More recently, we have begun to use a more conservative measure of compositional similarity. Our analyses previously used the asymmetric Jaccard Index, which considers only species identity, but not structure; for example, shifts in dominance. To account for changes in both species identity and community structure due to human activities, we have now implemented the <a href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.12693" target="_blank">balanced Bray-Curtis index</a>. You’ll find more information about the differences between the indices below.</p>
+BII, being an indicator of the average state of local ecological communities, complements indicators based on species’ global conservation status (such as the Sampled Red List Index), or on population trends (such as the Living Planet Index). These different facets of biodiversity are all important, and <a href="https://www.nature.com/articles/s41893-018-0130-0" target="_blank">can be combined to provide a roadmap towards restoring global biodiversity</a>.
 </details>
 </div>
 <div id="load-some-packages" class="section level1">
 <h1>Load some packages</h1>
 <pre class="r"><code>library(dplyr) # for easy data manipulation
 library(tidyr) # ditto
+library(tibble) # ditto
 library(magrittr) # for piping
 library(lme4) # for mixed effects models
 library(car) # for logit transformation with adjustment
+library(betapart) # for calculating balanced bray-curtis dissimilarity
 library(raster) # for working with raster data
 library(geosphere) # calculating geographic distance between sites
-library(foreach) # running loops
-library(doParallel) # running loops in parallel</code></pre>
+library(purrr) # running loops
+library(furrr) # running loops in parallel
+library(viridis) # figure colours for colour blindness</code></pre>
 </div>
 <div id="prepare-the-biodiversity-data" class="section level1">
 <h1>Prepare the biodiversity data</h1>
-<p>You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a></a>. If you’re working in <code>R</code>, I would strongly suggest downloading <code>database.rds</code> (the database is very large, and the rds file is much quicker to load in than the csv file).</p>
+<p>You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a></a>. If you’re working in <code>R</code>, I would strongly suggest downloading <code>database.rds</code> (the database is very large, and the .rds file is much quicker to load in than the .csv file).</p>
 <p>Once you’ve downloaded the database, read it in. I’m going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for <em>any</em> region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.</p>
 <pre class="r"><code># read in the data
 diversity &lt;- readRDS(&quot;database.rds&quot;) %&gt;%
@@ -1570,102 +1581,102 @@ diversity &lt;- readRDS(&quot;database.rds&quot;) %&gt;%
   filter(UN_region == &quot;Americas&quot;)
 
 glimpse(diversity)</code></pre>
-<pre><code>## Observations: 825,682
-## Variables: 67
-## $ Source_ID                               &lt;fct&gt; AD1_2005__Shuler, AD1_...
-## $ Reference                               &lt;fct&gt; Shuler et al. 2005, Sh...
-## $ Study_number                            &lt;int&gt; 1, 1, 1, 1, 1, 1, 1, 1...
-## $ Study_name                              &lt;fct&gt; Shuler2005_flowervisit...
-## $ SS                                      &lt;fct&gt; AD1_2005__Shuler 1, AD...
-## $ Diversity_metric                        &lt;fct&gt; effort-corrected abund...
-## $ Diversity_metric_unit                   &lt;fct&gt; effort-corrected indiv...
-## $ Diversity_metric_type                   &lt;fct&gt; Abundance, Abundance, ...
-## $ Diversity_metric_is_effort_sensitive    &lt;lgl&gt; FALSE, FALSE, FALSE, F...
-## $ Diversity_metric_is_suitable_for_Chao   &lt;lgl&gt; FALSE, FALSE, FALSE, F...
-## $ Sampling_method                         &lt;fct&gt; systematic searching, ...
-## $ Sampling_effort_unit                    &lt;fct&gt; day, day, day, day, da...
-## $ Study_common_taxon                      &lt;fct&gt; Hymenoptera, Hymenopte...
-## $ Rank_of_study_common_taxon              &lt;fct&gt; Order, Order, Order, O...
-## $ Site_number                             &lt;int&gt; 1, 1, 1, 1, 1, 2, 2, 2...
-## $ Site_name                               &lt;fct&gt; Ayrshire Farms, Ayrshi...
-## $ Block                                   &lt;fct&gt; , , , , , , , , , , , ...
-## $ SSS                                     &lt;fct&gt; AD1_2005__Shuler 1 1, ...
-## $ SSB                                     &lt;fct&gt; AD1_2005__Shuler 1 , A...
-## $ SSBS                                    &lt;fct&gt; AD1_2005__Shuler 1  1,...
-## $ Sample_start_earliest                   &lt;date&gt; 2003-07-07, 2003-07-0...
-## $ Sample_end_latest                       &lt;date&gt; 2003-08-05, 2003-08-0...
-## $ Sample_midpoint                         &lt;date&gt; 2003-07-21, 2003-07-2...
-## $ Sample_date_resolution                  &lt;fct&gt; day, day, day, day, da...
-## $ Max_linear_extent_metres                &lt;dbl&gt; 2844.9464, 2844.9464, ...
-## $ Habitat_patch_area_square_metres        &lt;dbl&gt; 4046856.4, 4046856.4, ...
-## $ Sampling_effort                         &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1...
-## $ Rescaled_sampling_effort                &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1...
-## $ Habitat_as_described                    &lt;fct&gt; Squash or pumpkin farm...
-## $ Predominant_land_use                    &lt;fct&gt; Cropland, Cropland, Cr...
-## $ Source_for_predominant_land_use         &lt;fct&gt; Direct from publicatio...
-## $ Use_intensity                           &lt;fct&gt; Light use, Light use, ...
-## $ Km_to_nearest_edge_of_habitat           &lt;dbl&gt; NA, NA, NA, NA, NA, NA...
-## $ Years_since_fragmentation_or_conversion &lt;dbl&gt; NA, NA, NA, NA, NA, NA...
-## $ Transect_details                        &lt;fct&gt; , , , , , , , , , , , ...
-## $ Coordinates_method                      &lt;fct&gt; Direct from publicatio...
-## $ Longitude                               &lt;dbl&gt; -77.86848, -77.86848, ...
-## $ Latitude                                &lt;dbl&gt; 38.95733, 38.95733, 38...
-## $ Country_distance_metres                 &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0...
-## $ Country                                 &lt;fct&gt; United States, United ...
-## $ UN_subregion                            &lt;fct&gt; North America, North A...
-## $ UN_region                               &lt;fct&gt; Americas, Americas, Am...
-## $ Ecoregion_distance_metres               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0...
-## $ Ecoregion                               &lt;fct&gt; Piedmont, Piedmont, Pi...
-## $ Biome                                   &lt;fct&gt; Temperate Broadleaf &amp; ...
-## $ Realm                                   &lt;fct&gt; Nearctic, Nearctic, Ne...
-## $ Hotspot                                 &lt;fct&gt; , , , , , , , , , , , ...
-## $ Wilderness_area                         &lt;fct&gt; , , , , , , , , , , , ...
-## $ Taxon_number                            &lt;int&gt; 1, 2, 3, 4, 5, 1, 2, 3...
-## $ Taxon_name_entered                      &lt;fct&gt; Apis mellifera, Pepona...
-## $ Indication                              &lt;fct&gt; Hymenoptera: Apidae se...
-## $ Parsed_name                             &lt;fct&gt; Apis mellifera, Pepona...
-## $ Taxon                                   &lt;fct&gt; Apis mellifera, Pepona...
-## $ COL_ID                                  &lt;int&gt; 6845885, 6927991, 1302...
-## $ Name_status                             &lt;fct&gt; accepted name, accepte...
-## $ Rank                                    &lt;fct&gt; Species, Species, Fami...
-## $ Kingdom                                 &lt;fct&gt; Animalia, Animalia, An...
-## $ Phylum                                  &lt;fct&gt; Arthropoda, Arthropoda...
-## $ Class                                   &lt;fct&gt; Insecta, Insecta, Inse...
-## $ Order                                   &lt;fct&gt; Hymenoptera, Hymenopte...
-## $ Family                                  &lt;fct&gt; Apidae, Apidae, Halict...
-## $ Genus                                   &lt;fct&gt; Apis, Peponapis, , Mel...
-## $ Species                                 &lt;fct&gt; mellifera, pruinosa, ,...
-## $ Best_guess_binomial                     &lt;fct&gt; Apis mellifera, Pepona...
-## $ Higher_taxon                            &lt;fct&gt; Hymenoptera, Hymenopte...
-## $ Measurement                             &lt;dbl&gt; 0.00, 0.75, 0.00, 0.00...
-## $ Effort_corrected_measurement            &lt;dbl&gt; 0.00, 0.75, 0.00, 0.00...</code></pre>
+<pre><code>## Rows: 825,682
+## Columns: 67
+## $ Source_ID                               &lt;fct&gt; AD1_2005__Shuler, AD1_2005__Sh~
+## $ Reference                               &lt;fct&gt; Shuler et al. 2005, Shuler et ~
+## $ Study_number                            &lt;int&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ~
+## $ Study_name                              &lt;fct&gt; &quot;Shuler2005_flowervisitation&quot;,~
+## $ SS                                      &lt;fct&gt; AD1_2005__Shuler 1, AD1_2005__~
+## $ Diversity_metric                        &lt;fct&gt; effort-corrected abundance, ef~
+## $ Diversity_metric_unit                   &lt;fct&gt; effort-corrected individuals, ~
+## $ Diversity_metric_type                   &lt;fct&gt; Abundance, Abundance, Abundanc~
+## $ Diversity_metric_is_effort_sensitive    &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FA~
+## $ Diversity_metric_is_suitable_for_Chao   &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FA~
+## $ Sampling_method                         &lt;fct&gt; systematic searching, systemat~
+## $ Sampling_effort_unit                    &lt;fct&gt; day, day, day, day, day, day, ~
+## $ Study_common_taxon                      &lt;fct&gt; Hymenoptera, Hymenoptera, Hyme~
+## $ Rank_of_study_common_taxon              &lt;fct&gt; Order, Order, Order, Order, Or~
+## $ Site_number                             &lt;int&gt; 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ~
+## $ Site_name                               &lt;fct&gt; &quot;Ayrshire Farms&quot;, &quot;Ayrshire Fa~
+## $ Block                                   &lt;fct&gt; , , , , , , , , , , , , , , , ~
+## $ SSS                                     &lt;fct&gt; AD1_2005__Shuler 1 1, AD1_2005~
+## $ SSB                                     &lt;fct&gt; AD1_2005__Shuler 1 , AD1_2005_~
+## $ SSBS                                    &lt;fct&gt; AD1_2005__Shuler 1  1, AD1_200~
+## $ Sample_start_earliest                   &lt;date&gt; 2003-07-07, 2003-07-07, 2003-~
+## $ Sample_end_latest                       &lt;date&gt; 2003-08-05, 2003-08-05, 2003-~
+## $ Sample_midpoint                         &lt;date&gt; 2003-07-21, 2003-07-21, 2003-~
+## $ Sample_date_resolution                  &lt;fct&gt; day, day, day, day, day, day, ~
+## $ Max_linear_extent_metres                &lt;dbl&gt; 2844.9464, 2844.9464, 2844.946~
+## $ Habitat_patch_area_square_metres        &lt;dbl&gt; 4046856.4, 4046856.4, 4046856.~
+## $ Sampling_effort                         &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ~
+## $ Rescaled_sampling_effort                &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ~
+## $ Habitat_as_described                    &lt;fct&gt; &quot;Squash or pumpkin farm&quot;, &quot;Squ~
+## $ Predominant_land_use                    &lt;fct&gt; Cropland, Cropland, Cropland, ~
+## $ Source_for_predominant_land_use         &lt;fct&gt; Direct from publication / auth~
+## $ Use_intensity                           &lt;fct&gt; Light use, Light use, Light us~
+## $ Km_to_nearest_edge_of_habitat           &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, NA~
+## $ Years_since_fragmentation_or_conversion &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, NA~
+## $ Transect_details                        &lt;fct&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;~
+## $ Coordinates_method                      &lt;fct&gt; Direct from publication / auth~
+## $ Longitude                               &lt;dbl&gt; -77.86848, -77.86848, -77.8684~
+## $ Latitude                                &lt;dbl&gt; 38.95733, 38.95733, 38.95733, ~
+## $ Country_distance_metres                 &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ~
+## $ Country                                 &lt;fct&gt; &quot;United States&quot;, &quot;United State~
+## $ UN_subregion                            &lt;fct&gt; North America, North America, ~
+## $ UN_region                               &lt;fct&gt; Americas, Americas, Americas, ~
+## $ Ecoregion_distance_metres               &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ~
+## $ Ecoregion                               &lt;fct&gt; &quot;Piedmont&quot;, &quot;Piedmont&quot;, &quot;Piedm~
+## $ Biome                                   &lt;fct&gt; &quot;Temperate Broadleaf &amp; Mixed F~
+## $ Realm                                   &lt;fct&gt; Nearctic, Nearctic, Nearctic, ~
+## $ Hotspot                                 &lt;fct&gt; , , , , , , , , , , , , , , , ~
+## $ Wilderness_area                         &lt;fct&gt; , , , , , , , , , , , , , , , ~
+## $ Taxon_number                            &lt;int&gt; 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, ~
+## $ Taxon_name_entered                      &lt;fct&gt; &quot;Apis mellifera&quot;, &quot;Peponapis p~
+## $ Indication                              &lt;fct&gt; &quot;Hymenoptera: Apidae sensu lat~
+## $ Parsed_name                             &lt;fct&gt; &quot;Apis mellifera&quot;, &quot;Peponapis p~
+## $ Taxon                                   &lt;fct&gt; Apis mellifera, Peponapis prui~
+## $ COL_ID                                  &lt;int&gt; 6845885, 6927991, 13025322, 69~
+## $ Name_status                             &lt;fct&gt; accepted name, accepted name, ~
+## $ Rank                                    &lt;fct&gt; Species, Species, Family, Spec~
+## $ Kingdom                                 &lt;fct&gt; Animalia, Animalia, Animalia, ~
+## $ Phylum                                  &lt;fct&gt; Arthropoda, Arthropoda, Arthro~
+## $ Class                                   &lt;fct&gt; Insecta, Insecta, Insecta, Ins~
+## $ Order                                   &lt;fct&gt; Hymenoptera, Hymenoptera, Hyme~
+## $ Family                                  &lt;fct&gt; Apidae, Apidae, Halictidae, Ap~
+## $ Genus                                   &lt;fct&gt; Apis, Peponapis, , Melissodes,~
+## $ Species                                 &lt;fct&gt; mellifera, pruinosa, , bimacul~
+## $ Best_guess_binomial                     &lt;fct&gt; Apis mellifera, Peponapis prui~
+## $ Higher_taxon                            &lt;fct&gt; Hymenoptera, Hymenoptera, Hyme~
+## $ Measurement                             &lt;dbl&gt; 0.00, 0.75, 0.00, 0.00, 0.00, ~
+## $ Effort_corrected_measurement            &lt;dbl&gt; 0.00, 0.75, 0.00, 0.00, 0.00, ~</code></pre>
 <p><a href="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303" target="_blank">This paper</a> describes the PREDICTS database structure and content. Briefly, the database consists of a number of different sources (journal articles), <code>Source_ID</code> in the database, within which there can be multiple studies (<code>Study_name</code> and <code>Study_number</code>). Within each study, there are multiple sites (<code>Site_name</code> and <code>Site_number</code>) within blocks (<code>Block</code>). For ease, we use the combined, shorthand values for these: <code>SS</code> (<code>Study_number</code> and <code>Source_ID</code>), <code>SSB</code> (<code>SS</code> and <code>Block</code>) and <code>SSBS</code> (<code>SSB</code> and<code>Site_number</code>).</p>
 <p>Now let’s explore the data a little.</p>
 <pre class="r"><code>table(diversity$Predominant_land_use, diversity$Use_intensity)</code></pre>
 <pre><code>##                                           
-##                                            Minimal use Light use
-##   Primary vegetation                            163302     73282
-##   Young secondary vegetation                     36731      9427
-##   Intermediate secondary vegetation              51349     12968
-##   Mature secondary vegetation                    39909      5936
-##   Secondary vegetation (indeterminate age)       44260     10349
-##   Plantation forest                               9046     18478
-##   Pasture                                        38321     93577
-##   Cropland                                       13184     37887
-##   Urban                                           7431      5547
-##   Cannot decide                                      0         0
+##                                            Minimal use Light use Intense use
+##   Primary vegetation                            163302     73282       22783
+##   Young secondary vegetation                     36731      9427        3673
+##   Intermediate secondary vegetation              51349     12968        1041
+##   Mature secondary vegetation                    39909      5936         396
+##   Secondary vegetation (indeterminate age)       44260     10349         373
+##   Plantation forest                               9046     18478        9429
+##   Pasture                                        38321     93577        2612
+##   Cropland                                       13184     37887       18751
+##   Urban                                           7431      5547        1772
+##   Cannot decide                                      0         0           0
 ##                                           
-##                                            Intense use Cannot decide
-##   Primary vegetation                             22783         12828
-##   Young secondary vegetation                      3673          7467
-##   Intermediate secondary vegetation               1041          5135
-##   Mature secondary vegetation                      396          2814
-##   Secondary vegetation (indeterminate age)         373          5407
-##   Plantation forest                               9429          2985
-##   Pasture                                         2612         29274
-##   Cropland                                       18751         24188
-##   Urban                                           1772           332
-##   Cannot decide                                      0          3438</code></pre>
+##                                            Cannot decide
+##   Primary vegetation                               12828
+##   Young secondary vegetation                        7467
+##   Intermediate secondary vegetation                 5135
+##   Mature secondary vegetation                       2814
+##   Secondary vegetation (indeterminate age)          5407
+##   Plantation forest                                 2985
+##   Pasture                                          29274
+##   Cropland                                         24188
+##   Urban                                              332
+##   Cannot decide                                     3438</code></pre>
 <p>There’s lots of data for the Americas across all land-use and intensity classes. Since we’re using a simplified model for illustration purposes, we’re not going to look at <em>all</em> the use intensities here. However, we will keep <em>minimally-used primary vegetation</em> separate, as this is the closest we have to a <em>pristine</em> baseline.</p>
 <p>So let’s collapse down the data. Note that I’m doing this purely to make the example simpler. In reality, we include multiple land use and intensity combinations, including the age class of secondary vegetation when possible.</p>
 <pre class="r"><code>diversity &lt;- diversity %&gt;%
@@ -1728,8 +1739,67 @@ glimpse(diversity)</code></pre>
 </div>
 <div id="compositional-similarity" class="section level2">
 <h2>Compositional Similarity</h2>
-<p>We use the <em>asymmetric Jaccard Index</em> as our measure of compositional similarity. Essentially, we want to know what species are present in our baseline sites (<code>Primary minimal</code>), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site.</p>
-<p>As an example, let’s look at the following simple scenario. Our primary minimal site had 15 <em>Species A</em> individuals and 30 <em>Species B</em> individuals. A cropland site has 10 <em>Species A</em> and 40 <em>Species C</em> individuals. The compositional similarity measure that we use currently would say that only 10 out of a total 50 individuals in the cropland site were from <em>originally present species</em> (i.e. <em>Species A</em>): a value of 0.2.</p>
+<p>Up until recently, we used the <em>asymmetric Jaccard Index</em> as our measure of compositional similarity. Essentially, we wanted to know what species are present in our baseline sites (<code>Primary minimal</code>), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site. We’re now using a more sensitive measure of compositional similarity – <em>balanced Bray-Curtis</em> – that considers changes in community structure, rather than just identiy.</p>
+<p>Let’s take a look at a couple of examples to illustrate the differences between these two measures of compositional similarity.</p>
+<p><em>Example 1:</em></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Site</th>
+<th align="center">Species A</th>
+<th align="center">Species B</th>
+<th align="center">Species C</th>
+<th align="center">Species D</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Site 1: Primary minimal</td>
+<td align="center">35</td>
+<td align="center">15</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="left">Site 2: Cropland</td>
+<td align="center">15</td>
+<td align="center">35</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+</tbody>
+</table>
+<p>Here we’ve got no new species and no changes in abundance, but the dominance structure has totally changed – Species A is the most dominant in Site 1, but Species B is most dominant in Site 2. The <em>asymmetric Jaccard Index</em> would say that these sites have a similarity of 1, because there are no novel species (100% of the individuals come from ‘originally-present species’). Our new measure, however, would say that there is a similarity of 0.6, because there has been a change in community structure.</p>
+<p><em>Example 2:</em></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Site</th>
+<th align="center">Species A</th>
+<th align="center">Species B</th>
+<th align="center">Species C</th>
+<th align="center">Species D</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Site 1: Primary minimal</td>
+<td align="center">35</td>
+<td align="center">24</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr class="even">
+<td align="left">Site 2: Cropland</td>
+<td align="center">10</td>
+<td align="center">0</td>
+<td align="center">45</td>
+<td align="center">5</td>
+</tr>
+</tbody>
+</table>
+<p>In this example, we’ve got some new species in the Cropland site, a shift in dominance (Species A is the most dominant in Primary minimal, but not in Cropland), but the same overall abundance in both sites.</p>
+<p>When we calculate the compositional similarity using our previous measure, we get a value of 0.25 (because 15 out of the 60 individuals in Site 2 were also present in Site 1), but with our new measure, we get a value of 0.18.</p>
 <p>Now, for every study with a <code>Primary minimal</code> site, we want to calculate this compositional similarity measure against every other site in the study. Note that this has to be done <em>within</em> studies: it would be pointless to compare similarity between a site from a study of birds with a site from a study of bees.</p>
 <p>Let’s first set up the data we’re going to use for the compositional similarity models.</p>
 <pre class="r"><code>cd_data_input &lt;- diversity %&gt;%
@@ -1767,92 +1837,59 @@ glimpse(diversity)</code></pre>
   
   # drop empty factor levels
   droplevels()</code></pre>
-<p>Now we’ll set up a function to calculate compositional similarity between a single pair of sites in a study.</p>
-<pre class="r"><code>getJacAbSym &lt;- function(s1, s2, data){
-
-  # get the list of species that are present in site 1 (i.e., their abundance was greater than 0)
-  s1species &lt;- data %&gt;%
-    
-    # filter out the SSBS that matches s1
-    filter(SSBS == s1) %&gt;%
-    
-    # filter out the species where the Measurement (abundance) is greater than 0
-    filter(Measurement &gt; 0) %&gt;%
-    
-    # get the unique species from this dataset
-    distinct(Taxon_name_entered) %&gt;%
-    
-    # pull out the column into a vector
-    pull
+<p>Now we’ll set up a function to calculate compositional similarity between a single pair of sites in a study (See the previous version of this walkthrough for the function for calculating the asymmetrical Jaccard’s similarity).</p>
+<pre class="r"><code>get_bray &lt;- function(s1, s2, data){
   
-  # for site 2, get the total abundance of species that are also present in site 1
+  require(betapart)
   
-  s2abundance_s1species &lt;- data %&gt;%
+  sp_data &lt;- data %&gt;%
     
-    # filter out the SSBS that matches s2
-    filter(SSBS == s2) %&gt;%
+    # filter out the SSBS that matches the pair of sites we&#39;re interested in
+    filter(SSBS %in% c(s1, s2)) %&gt;%
     
-    # filter out the species that are also present in site 1
-    filter(Taxon_name_entered %in% s1species) %&gt;%
+    # pull out the site name, species name and abundance information
+    dplyr::select(SSBS, Taxon_name_entered, Measurement) %&gt;%
     
-    # pull out the Measurement into a vector
-    pull(Measurement) %&gt;%
+    # pivot so that each column is a species and each row is a site
+    pivot_wider(names_from = Taxon_name_entered, values_from = Measurement) %&gt;%
     
-    # calculate the sum
-    sum()
+    # set the rownames to the SSBS and then remove that column
+    column_to_rownames(&quot;SSBS&quot;)
   
-  # calculate the total abundance of all species in site 2
-  s2_sum &lt;- data %&gt;%
-    
-    # filter out the SSBS that matches s2
-    filter(SSBS == s2) %&gt;%
-    
-    # pull out the measurement column (the abundance)
-    pull(Measurement) %&gt;%
-    
-    # calculate the sum
-    sum() 
+  # if one of the sites doesn&#39;t have any individuals in it
+  # i.e. the row sum is 0
+  if(sum(rowSums(sp_data) == 0, na.rm = TRUE) == 1){
+    # then the similarity between sites should be 0
+    bray &lt;- 0
+  # if both sites have no individuals
+  }else if(sum(rowSums(sp_data) == 0, na.rm = TRUE) == 2){
+    # then class the similarity as NA
+    bray &lt;- NA
+  # otherwise if both sites have individuals, calculate the balanced bray-curtis
+  # as similarity (1-bray)
+  }else{
+    bray &lt;- 1 - 
+      bray.part(sp_data) %&gt;%
+      pluck(&quot;bray.bal&quot;) %&gt;%
+      pluck(1)
+  }
   
-  
-  # Now calculate the compositional similarity
-  # this is the number of individuals of species also found in s1, divided by the total abundance in s2 
-  # so that equates to the proportion of individuals in s2 that are of species also found in s1
-  
-  sor &lt;- s2abundance_s1species / s2_sum
-
-  
-  # if there are no taxa in common, then sor = 0
-  # if abundances of all taxa are zero, then similarity becomes NaN.
-  return(sor)
-  
-  }</code></pre>
-<p>Now that we’ve set up all the functions to gather the data for the compositional similarity models, let’s get the dataset. We’ll first get together a vector of all the study IDs that we need to perform the calculations for.</p>
+}</code></pre>
+<p>Now that we’ve got the function to gather the data for the compositional similarity models, let’s get the dataset. We’ll first get together a vector of all the study IDs that we need to perform the calculations for.</p>
 <pre class="r"><code># get a vector of each study to loop over
-studies &lt;- distinct(cd_data_input, SS) %&gt;%
+studies &lt;- cd_data_input %&gt;%
+  distinct(SS) %&gt;%
   pull()</code></pre>
-<p>Now we have to loop over each element in <code>studies</code> and calculate:</p>
-<ol style="list-style-type: decimal">
-<li>the compositional similarity between each pair of sites</li>
-<li>the geographic distance between each pair of sites</li>
-<li>the land uses for each pair of sites</li>
-</ol>
-<p>I’m going to do this in parallel, as we’re looping over a lot of studies.</p>
-<pre class="r"><code>registerDoParallel(cores = 2)
-
-# If you&#39;re not familiar with loops (or with foreach loops):
-# I&#39;m going to loop over every element (s) in studies and combine the results of each loop by rbinding them into one large dataset. Since we&#39;re using functions from different packages within this loop, we need to specify them (if you don&#39;t do the loop in parallel, this isn&#39;t necessary)
-cd_data &lt;- foreach(s = studies, 
-                   .combine = rbind,
-                   .packages = c(&quot;dplyr&quot;, &quot;magrittr&quot;, &quot;geosphere&quot;)) %dopar% {
+<p>Next, get all the site comparisons for each study. We’re using the <code>purrr:map</code> function here which will loop over each study in turn and perform the custom function we’ve specified. Note that we’re using <code>map_dfr</code> because at the end, I’d like a dataframe where each row gives the pair of sites that need comparing.</p>
+<pre class="r"><code>site_comparisons &lt;- map_dfr(.x = studies, .f = function(x){
   
   # filter out the given study
-  data_ss &lt;- filter(cd_data_input, SS == s)
-  
-  # pull out the SSBS and LandUse information (we&#39;ll use this later to assign a land use contrast to each pair of site
-  site_data &lt;- data_ss %&gt;%
+  site_data &lt;- filter(cd_data_input, SS == x) %&gt;%
+    # pull out the SSBS and LandUse information
     dplyr::select(SSBS, LandUse) %&gt;%
+    # simplify the data so we only have one row for each site
     distinct(SSBS, .keep_all = TRUE)
-  
+
   # pull out the sites that are Primary minimal (we only want to use comparisons with the baseline)
   baseline_sites &lt;- site_data %&gt;%
     filter(LandUse == &quot;Primary minimal&quot;) %&gt;%
@@ -1862,7 +1899,6 @@ cd_data &lt;- foreach(s = studies,
   site_list &lt;- site_data %&gt;%
     pull(SSBS)
   
-
   # get all site x site comparisons for this study
   site_comparisons &lt;- expand.grid(baseline_sites, site_list) %&gt;%
     
@@ -1870,40 +1906,71 @@ cd_data &lt;- foreach(s = studies,
     rename(s1 = Var1, s2 = Var2) %&gt;%
     
     # remove the comparisons where the same site is being compared to itself
-    filter(s1 != s2)
+    filter(s1 != s2) %&gt;%
     
+    # make the values characters rather than factors
+    mutate(s1 = as.character(s1),
+           s2 = as.character(s2),
+           
+           # add the full name
+           contrast = paste(s1, &quot;vs&quot;, s2, sep = &quot;_&quot;),
+           
+           # add the study id
+           SS = as.character(x))
   
-  # apply the compositional similarity function over each site combination in the dataset
-  sor &lt;- apply(site_comparisons, 1, function(y) getJacAbSym(data = data_ss, s1 = y[&#39;s1&#39;], s2 = y[&#39;s2&#39;]))
-  
-  # calculate the geographic distance between sites
-  # first pull out the lat and longs for each site combination
-  s1LatLong &lt;- as.matrix(data_ss[match(site_comparisons$s1, data_ss$SSBS), c(&#39;Longitude&#39;,&#39;Latitude&#39;)])
-  s2LatLong &lt;- as.matrix(data_ss[match(site_comparisons$s2, data_ss$SSBS), c(&#39;Longitude&#39;,&#39;Latitude&#39;)])
+  return(site_comparisons)
+})</code></pre>
+<p>For each study and set of comparisons, we need to calculate the compositional similarity. We’re going to set this up to run in parallel. I’m using the <code>purrr::map</code> functions here (made to run in parallel using the <code>furrr</code> package), but there are other options, like <code>for</code> loops or <code>apply</code>.</p>
+<pre class="r"><code>future::plan(multisession, workers = 4)
 
-  # then calculate the distance between sites
-  dist &lt;- distHaversine(s1LatLong, s2LatLong)
+# I&#39;m using map2 (because there are two arguments I&#39;m passing through - s1 and s2)
+# and the map2_dbl because the output I want is a vector of numbers (double rather than integer format)
+# so this function is going to go through each s1 and s2 in turn
+# and pass them into the get_bray function
+bray &lt;- future_map2_dbl(.x = site_comparisons$s1,
+                        .y = site_comparisons$s2,
+                        ~get_bray(s1 = .x, s2 = .y, data = cd_data_input))
 
-  # pull out the land-use contrast for those site combinations
-  Contrast &lt;- paste(site_data$LandUse[match(site_comparisons$s1, site_data$SSBS)],
-                    site_data$LandUse[match(site_comparisons$s2, site_data$SSBS)], 
-                    sep = &quot;-&quot;)
-  
-  # put all the information into a single dataframe
-  
-  study_results &lt;- data.frame(site_comparisons,
-                              sor,
-                              dist,
-                              Contrast,
-                              SS = s,
-                              stringsAsFactors = TRUE)
+# stop running things in parallel for now
+future::plan(sequential)</code></pre>
+<p>Next we’ll pull out the additional data we need (which don’t require a loop), including the geographic distance between sites and the land uses.</p>
+<pre class="r"><code># for the other required information, we don&#39;t need to run loops
+latlongs &lt;- cd_data_input %&gt;%
+  # for each site in the dataset
+  group_by(SSBS) %&gt;%
+  # pull out the lat and long
+  summarise(Lat = unique(Latitude),
+            Long = unique(Longitude))
 
-  
-  
-}
-
-# stop running things in parallel
-registerDoSEQ()</code></pre>
+lus &lt;- cd_data_input %&gt;%
+  # for each site in the dataset
+  group_by(SSBS) %&gt;%
+  # pull out the land use
+  summarise(lu = unique(LandUse))</code></pre>
+<p>Let’s put all the data together into a dataset we can use for modelling.</p>
+<pre class="r"><code># now let&#39;s put all the data together
+cd_data &lt;- site_comparisons %&gt;%
+  # add in the bray-curtis data
+  # which is already in the same order as site_comparisons
+  mutate(bray = bray) %&gt;%
+  # get the lat and long for s1
+  left_join(latlongs, by = c(&quot;s1&quot; = &quot;SSBS&quot;)) %&gt;%
+  rename(s1_lat = Lat,
+         s1_long = Long) %&gt;%
+  # get the lat and long for s2
+  left_join(latlongs, by = c(&quot;s2&quot; = &quot;SSBS&quot;)) %&gt;%
+  rename(s2_lat = Lat,
+         s2_long = Long) %&gt;%
+  # calculate the geographic distances between s1 and s2 sites
+  mutate(geog_dist = distHaversine(cbind(s1_long, s1_lat), cbind(s2_long, s2_lat))) %&gt;%
+  # get the land use for s1
+  left_join(lus, by = c(&quot;s1&quot; = &quot;SSBS&quot;)) %&gt;%
+  rename(s1_lu = lu) %&gt;%
+  # get the land use for s2
+  left_join(lus, by = c(&quot;s2&quot; = &quot;SSBS&quot;)) %&gt;%
+  rename(s2_lu = lu) %&gt;%
+  # create an lu_contrast column (what we&#39;ll use for modelling)
+  mutate(lu_contrast = paste(s1_lu, s2_lu, sep = &quot;_vs_&quot;))</code></pre>
 </div>
 </div>
 <div id="run-the-statistical-analysis" class="section level1">
@@ -1954,74 +2021,68 @@ summary(ab_m)</code></pre>
 </div>
 <div id="compositional-similarity-1" class="section level2">
 <h2>Compositional Similarity</h2>
-<p>Now let’s do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount <em>natural</em> turnover in species with distance. You can also include environmental distance (we’ve done this previously based on Gower’s dissimilarity of climatic variables) and additional human pressures in models like this.</p>
-<p>The compositional similarity measure we use is bounded between 0 and 1 – this means the errors will probably not be normally distributed. Although log-transformation produced models with acceptable diagnostics, it doesn’t respect the boundedness of the compositional similarity measure. We’ve found that a logit transformation (with an adjustment to account for 0s and 1s), which does recognise the boundedness, also gives acceptable diagnostics.</p>
+<p>Now let’s do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount <em>natural</em> turnover in species with distance. You can also include environmental distance (we’ve done this previously based on Gower’s dissimilarity of climatic variables). You might also want to include additional pressure variables in the compositional similarity model, such as human population density and road density. We usually do this by including the pressure at site 2 (the non-baseline site) as well as the <em>difference</em> in pressure between site 1 and site 2.</p>
+<p>The compositional similarity measure we use is bounded between 0 and 1 – this means the errors will probably not be normally distributed. Although log-transformation produced models with acceptable diagnostics, it doesn’t respect the boundedness of the compositional similarity measure. We’ve found that a logit transformation (with an adjustment to account for 0s and 1s) also gives acceptable diagnostics and is conceptually more appropriate as it does recognise the boundedness of the data.</p>
 <pre class="r"><code># there is some data manipulation we want to do before modelling
 cd_data &lt;- cd_data %&gt;%
   
-  # Firstly, we only care about comparisons where Primary minimal is the first site
-  # so pull the contrast apart
-  separate(Contrast, c(&quot;s1_LandUse&quot;, &quot;s2_LandUse&quot;), sep = &quot;-&quot;, remove = FALSE) %&gt;%
-  
-  # filter sites where s1_LandUse is the baseline site
-  filter(s1_LandUse == &quot;Primary minimal&quot;) %&gt;%
-  
   # logit transform the compositional similarity
-  mutate(logitCS = logit(sor, adjust = 0.001, percents = FALSE)) %&gt;%
+  mutate(logitCS = logit(bray, adjust = 0.001, percents = FALSE)) %&gt;%
   
   # log10 transform the geographic distance between sites
-  mutate(log10geo = log10(dist + 1)) %&gt;%
+  mutate(log10geo = log10(geog_dist + 1)) %&gt;%
   
   # make primary minimal-primary minimal the baseline again
-  mutate(Contrast = factor(Contrast), 
-         Contrast = relevel(Contrast, ref = &quot;Primary minimal-Primary minimal&quot;))
+  mutate(lu_contrast = factor(lu_contrast), 
+         lu_contrast = relevel(lu_contrast, ref = &quot;Primary minimal_vs_Primary minimal&quot;))
 
 
 # Model compositional similarity as a function of the land-use contrast and the geographic distance between sites
-cd_m &lt;- lmer(logitCS ~ Contrast + log10geo + (1|SS), data = cd_data)
+cd_m &lt;- lmer(logitCS ~ lu_contrast + log10geo + (1|SS) + (1|s2), data = cd_data)
 summary(cd_m)</code></pre>
 <pre><code>## Linear mixed model fit by REML [&#39;lmerMod&#39;]
-## Formula: logitCS ~ Contrast + log10geo + (1 | SS)
+## Formula: logitCS ~ lu_contrast + log10geo + (1 | SS) + (1 | s2)
 ##    Data: cd_data
 ## 
-## REML criterion at convergence: 757398.2
+## REML criterion at convergence: 761577.7
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -2.9033 -0.7263  0.0671  0.5304  3.7308 
+## -4.6947 -0.4063 -0.0026  0.4115  4.9909 
 ## 
 ## Random effects:
 ##  Groups   Name        Variance Std.Dev.
-##  SS       (Intercept) 6.469    2.544   
-##  Residual             9.423    3.070   
-## Number of obs: 148985, groups:  SS, 95
+##  s2       (Intercept) 2.257    1.502   
+##  SS       (Intercept) 4.446    2.109   
+##  Residual             7.699    2.775   
+## Number of obs: 154482, groups:  s2, 3452; SS, 89
 ## 
 ## Fixed effects:
-##                                              Estimate Std. Error t value
-## (Intercept)                                   2.33360    0.28152   8.289
-## ContrastPrimary minimal-Primary vegetation   -0.32459    0.03191 -10.171
-## ContrastPrimary minimal-Urban                -1.66278    0.04343 -38.285
-## ContrastPrimary minimal-Pasture              -1.90225    0.03146 -60.468
-## ContrastPrimary minimal-Secondary vegetation  0.10686    0.03659   2.920
-## ContrastPrimary minimal-Plantation forest    -0.45909    0.07290  -6.297
-## ContrastPrimary minimal-Cropland             -1.20430    0.04511 -26.699
-## log10geo                                     -0.28403    0.01069 -26.563
+##                                                     Estimate Std. Error t value
+## (Intercept)                                         0.716768   0.248564   2.884
+## lu_contrastPrimary minimal_vs_Cropland             -1.373285   0.163055  -8.422
+## lu_contrastPrimary minimal_vs_Pasture              -2.045541   0.106321 -19.239
+## lu_contrastPrimary minimal_vs_Plantation forest    -0.342362   0.170453  -2.009
+## lu_contrastPrimary minimal_vs_Primary vegetation   -0.251758   0.106679  -2.360
+## lu_contrastPrimary minimal_vs_Secondary vegetation -0.099924   0.101406  -0.985
+## lu_contrastPrimary minimal_vs_Urban                -1.493001   0.185705  -8.040
+## log10geo                                           -0.164548   0.009637 -17.075
 ## 
 ## Correlation of Fixed Effects:
-##             (Intr) CPm-Pv CnPm-U CnPm-P CPm-Sv CPm-Pf CnPm-C
-## CntrstPm-Pv -0.026                                          
-## CntrstPmn-U -0.005  0.285                                   
-## CntrstPmn-P -0.022  0.296  0.164                            
-## CntrstPm-Sv -0.043  0.238  0.120  0.286                     
-## CntrstPm-Pf -0.038  0.172  0.109  0.118  0.165              
-## CntrstPmn-C -0.016  0.213  0.237  0.147  0.222  0.091       
-## log10geo    -0.138 -0.046 -0.103 -0.056 -0.035 -0.012 -0.037</code></pre>
-<p>Note that you can’t trust the significance values of these compositional similarity values. The same site goes into multiple comparisons in the model (each Primary minimal site is compared to all other sites in the study), which will inflate the p-values. If you want to look at significance values, you’ll need to use permutation tests in order to see which effects are significant. We’re not going to do that here because they can take a while.</p>
+##             (Intr) l_Pm__C l_Pm__P l_Pm_f l_Pm__Pv l_Pm__Sv l_Pm__U
+## l_cntrPm__C -0.068                                                 
+## l_cntrPm__P -0.107  0.146                                          
+## l_cntPm__Pf -0.110  0.088   0.163                                  
+## l_cntPm__Pv -0.114  0.184   0.294   0.233                          
+## l_cntPm__Sv -0.150  0.219   0.326   0.223  0.289                   
+## l_cntrPm__U -0.063  0.185   0.124   0.088  0.229    0.109          
+## log10geo    -0.139 -0.014  -0.020  -0.006 -0.021   -0.018   -0.022</code></pre>
+<p>Note that you can’t trust the significance values of these compositional similarity values. The same site goes into multiple comparisons in the model (each Primary minimal site is compared to all other sites in the study), which will inflate the p-values. We’ve added in a random intercept for site 2 (<code>s2</code>) to try to account for this, but really if you want to look at significance values, you’ll need to use permutation tests in order to see which effects are significant. We’re not going to do that here because they can take a while.</p>
 </div>
 </div>
 <div id="projecting-the-model" class="section level1">
 <h1>Projecting the model</h1>
-<p>Now we have one model (<code>ab_m</code>) telling us how land-use change influences the total abundance of species and one model (<code>cs_m</code>) that tells us what proportion of those individuals are from ‘originally present species’ in a community. Multiplying these together gives us the BII: the abundance of originally present species. We do this by projecting abundance and compositional similarity onto rasters of pressure data, and then multiplying the two output maps together.</p>
+<p>Now we have one model (<code>ab_m</code>) telling us how land-use change influences the total abundance of species and one model (<code>cs_m</code>) that tells how similar the community structure is. Multiplying these together gives us the BII: the intactness of nature in the system. We do this by projecting abundance and compositional similarity onto rasters of pressure data, and then multiplying the two output maps together. You can use python to project predicts-style models (<a href="https://github.com/ricardog/raster-project" target="_blank">See here for the code</a>), but let’s do it using R so you can see step-by-step exactly what’s happening.</p>
 <div id="model-predictions" class="section level2">
 <h2>Model predictions</h2>
 <p>First of all, let’s use the models to predict the abundance and compositional similarity in each land-use class, ignoring the impact of random effects (see <code>help(predict.merMod)</code> for more details on this).</p>
@@ -2048,8 +2109,8 @@ inv_logit &lt;- function(f, a){
 
 # once again, set up the dataframe with all the levels you want to predict diversity for
 # because we had an extra fixed effect in this model (log10geo), we also have to set a baseline level for this
-# we&#39;ll set it to 0 because we&#39;re interested in the compositional similarity when distance between sites is 0 (i.e., when distance-based turnover is discounted, what is the turnover because of land use?)
-newdata_cd &lt;- data.frame(Contrast = levels(cd_data$Contrast),
+# We&#39;re interested in the compositional similarity when we discount natural turnover, so we want to set this to a static value. We&#39;ll use 0 here, but we can also set it to the median geographic distance in the original data or any other meaningful level.
+newdata_cd &lt;- data.frame(lu_contrast = levels(cd_data$lu_contrast),
                       log10geo = 0) %&gt;%
   mutate(cd_m_preds = predict(cd_m, ., re.form = NA) %&gt;%
            inv_logit(a = 0.001))</code></pre>
@@ -2057,7 +2118,7 @@ newdata_cd &lt;- data.frame(Contrast = levels(cd_data$Contrast),
 </div>
 <div id="gather-land-use-rasters" class="section level2">
 <h2>Gather land-use rasters</h2>
-<p>You can use any land-use data you like, but many land-use maps don’t have classes that map easily onto the definitions used by PREDICTS. Notable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a></a>), because PREDICTS land-use classes were designed with these maps in mind, and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&amp;v=3&amp;d=true" target="_blank">CSIRO<a></a>.</p>
+<p>You can use any land-use data you like, but many land-use maps don’t have classes that map easily onto the definitions used by PREDICTS. Notable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a></a>) – because PREDICTS land-use classes were designed with these maps in mind – and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&amp;v=3&amp;d=true" target="_blank">CSIRO<a></a>.</p>
 <p>I’m just going to simulate some rasters here for ease.</p>
 <p>We’ve got seven land-use classes. Imagine we have seven rasters, one for each land-use class, and the cell value is the proportion of the cell assigned to that land-use class. We’ll generate some random numbers for each of the land uses – let’s make it mostly cropland, with a fair chunk of pasture and secondary vegetation, with just patches of natural land and urban areas.</p>
 <pre class="r"><code># generate a dataframe with random numbers for the cell values for each land-use class
@@ -2102,8 +2163,8 @@ for(i in 1:ncol(lus)){
   
 }</code></pre>
 <p>For example, here’s the raster showing the amount of urban land in each cell:</p>
-<pre class="r"><code>plot(urb_raster)</code></pre>
-<p><img src="data:image/png;base64,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AQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAAAh4AAAACEPAAAAAQgIAHAACAAAQ8AAAABCDgAQAAIAABDwAAAAEIeAAAAAhAwAMAAEAA/wd36TO8D+EhHwAAAABJRU5ErkJggg==" width="672" /></p>
+<pre class="r"><code>plot(urb_raster, col = viridis(20))</code></pre>
+<p><img src="data:image/png;base64,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" width="672" /></p>
 </div>
 <div id="spatial-projections-of-bii" class="section level2">
 <h2>Spatial projections of BII</h2>
@@ -2120,21 +2181,21 @@ for(i in 1:ncol(lus)){
   newdata_ab$ab_m_preds[newdata_ab$LandUse == &#39;Primary minimal&#39;]
 
 
-cd_raster &lt;- (newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Primary minimal&#39;] * pri_min_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Primary vegetation&#39;] * pri_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Plantation forest&#39;] * plant_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Secondary vegetation&#39;] * sec_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Cropland&#39;] * crop_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Pasture&#39;] * pas_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Urban&#39;] * urb_raster) /
+cd_raster &lt;- (newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Primary minimal&#39;] * pri_min_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Primary vegetation&#39;] * pri_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Plantation forest&#39;] * plant_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Secondary vegetation&#39;] * sec_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Cropland&#39;] * crop_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Pasture&#39;] * pas_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Urban&#39;] * urb_raster) /
   
   # divide by the reference value
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == &#39;Primary minimal-Primary minimal&#39;]</code></pre>
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == &#39;Primary minimal_vs_Primary minimal&#39;]</code></pre>
 <p>The final step is to multiply the abundance and compositional similarity rasters together. We’ll also multiply the values by 100 so that BII is expressed as a percentage rather than a proportion.</p>
 <pre class="r"><code>bii &lt;- ab_raster * cd_raster
-plot(bii * 100)</code></pre>
-<p><img src="data:image/png;base64,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" width="672" /></p>
-<p>Once you have your map of BII, you can calculate the average value across any spatial scale. The average BII across this map is 80.81.</p>
+plot(bii * 100, col = viridis(20))</code></pre>
+<p><img src="data:image/png;base64,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oLl4HqhJ4kwI6A08D9Q7ApqLVyKZJM6Eu1Q38Eok7whoLl4Lb3LHTJa+7rn0DXl83RxQTpcnBDQb78ZkcvtM2gxcVKJ7/0teFb9k4xsqc7ocIaDZ5m/LeHj7+4Fu/q1q3T6T+RPpn39a/BZ3QJdtDCinyxECmm/tjcGvH4DynuHrbh/X2c71b3GPatlyQDldHhHQLfyx8qNplr6Ct/pbuGtcZ7sN49pkc0A5XX4Q0G2s/HDE5W+B8HMT190+rtmH7t3svt3/qLppTt0SUE6XGwQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMhEQAEgEwEFgEwEFAAyEVAAyERAASATAQWATAQUADIRUADIREABIBMBBYBMBBQAMhFQAMj0/wEKeLoC7snbpQAAAABJRU5ErkJggg==" width="672" /></p>
+<p>Once you have your map of BII, you can calculate the average value across any spatial scale. The average BII across this map is 57.59.</p>
 <p>And that is it. A quick walkthrough of how we use the PREDICTS database to model and project the Biodiversity Intactness Index.</p>
 </div>
 </div>
@@ -2154,7 +2215,7 @@ plot(bii * 100)</code></pre>
 <li>We have tested whether model parameters differ significantly among regions or taxonomic groups by testing for region <span class="math inline">\(\times\)</span> pressure or group <span class="math inline">\(\times\)</span> pressure interactions, e.g., <a href="https://www.nature.com/articles/srep31153" target="_blank">this paper</a> and <a href="https://link.springer.com/article/10.1007/s10531-017-1356-2" target="_blank">this paper</a>.</li>
 <li><a href="https://zslpublications.onlinelibrary.wiley.com/doi/full/10.1111/acv.12327" target="_blank">One paper</a> collected field data on birds at sites in Tanzania and Kenya, and compared an Africa-wide PREDICTS biodiversity model with a bird model based on the independent field data.</li>
 </ol>
-<p>A key assumption of our method for calculating BII is that species in minimally-used primary vegetation are <em>native</em> species. This is not always true, but we can’t always identify which species are native or alien in the PREDICTS database. For island communities where we can distinguish native species from alien species, we are working to compare BII as calculated above (with an abundance model and compositional similarity model) with BII modeled as the abundance of native species only (with an abundance model of <em>only</em> native species).</p>
+<p>A key assumption of our method for calculating BII is that species in minimally-used primary vegetation are <em>native</em> species. This is not always true, but we can’t always identify which species are native or alien in the PREDICTS database. For island communities where we can distinguish native species from alien species, we are working to compare BII as calculated above (with an abundance model and compositional similarity model) with BII modeled as the abundance of native species only (with an abundance model of <em>only</em> native species)(<a href="https://www.biorxiv.org/content/10.1101/2019.12.16.878041v1" target="_blank">See here</a> for some of the results of this work).</p>
 </div>
 </div>
 <div id="advantages" class="section level1">
@@ -2175,6 +2236,7 @@ plot(bii * 100)</code></pre>
 <div id="uncertainty" class="section level2">
 <h2>Uncertainty</h2>
 <p>Hopefully it goes without saying, but the uncertainty in the BII map will depend on its inputs, both in terms of the statistical models and the geospatial data used for projections. The higher the uncertainty in these aspects, the higher the uncertainty in the BII projections. Although land-use mapping is continually advancing, there are still limitations. So using a global map and then drilling down into a single pixel is not really advisable. Instead, the maps are more likely to be reliable when looking over broader areas and larger time steps, rather than pixel by pixel and year by year.</p>
+<p>Note that on the Natural History Museum’s <a href="https://www.nhm.ac.uk/our-science/data/biodiversity-indicators/biodiversity-intactness-index-data?future-scenario=ssp2_rcp4p5_message_globiom&amp;georegion=001&amp;min-year=1970&amp;max-year=2050&amp;georegion-compare=null&amp;show-uncertainty=true" target="_blank">Biodiversity Trends Explorer</a>, we’ve used cross-validation to produce upper and lower uncertainty bounds on the projections. We have refit the models leaving one biome out in turn, and then projected BII from these models; the highest and lowest projections in the set provide some uncertainty bounds. It is important to note, however, that these bounds only include some of the many sources uncertainty (mainly stemming from geographic bias in the underlying dataset and uncertainty in model fitting), so more work still needs to be done to effectively calculate and communicate uncertainty in our projections.</p>
 </div>
 <div id="bii-is-a-valuable-metric-but-isnt-the-only-answer" class="section level2">
 <h2>BII is a valuable metric, but isn’t the only answer</h2>
@@ -2184,9 +2246,9 @@ plot(bii * 100)</code></pre>
 <div id="r-info" class="section level1">
 <h1>R Info</h1>
 <pre class="r"><code>utils::sessionInfo()</code></pre>
-<pre><code>## R version 3.6.1 (2019-07-05)
+<pre><code>## R version 4.0.2 (2020-06-22)
 ## Platform: x86_64-w64-mingw32/x64 (64-bit)
-## Running under: Windows 7 x64 (build 7601) Service Pack 1
+## Running under: Windows 10 x64 (build 19043)
 ## 
 ## Matrix products: default
 ## 
@@ -2198,42 +2260,39 @@ plot(bii * 100)</code></pre>
 ## [5] LC_TIME=English_United Kingdom.1252    
 ## 
 ## attached base packages:
-## [1] parallel  stats     graphics  grDevices utils     datasets  methods  
-## [8] base     
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] doParallel_1.0.15 iterators_1.0.12  foreach_1.4.7    
-##  [4] geosphere_1.5-10  raster_3.0-2      sp_1.3-1         
-##  [7] car_3.0-3         carData_3.0-2     lme4_1.1-21      
-## [10] Matrix_1.2-17     magrittr_1.5      tidyr_0.8.3      
-## [13] dplyr_0.8.3      
+##  [1] viridis_0.5.1     viridisLite_0.3.0 furrr_0.2.3       future_1.23.0    
+##  [5] purrr_0.3.4       geosphere_1.5-10  raster_3.3-13     sp_1.4-2         
+##  [9] betapart_1.5.4    car_3.0-9         carData_3.0-4     lme4_1.1-23      
+## [13] Matrix_1.2-18     magrittr_1.5      tibble_3.0.3      tidyr_1.1.1      
+## [17] dplyr_1.0.7      
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] tidyselect_0.2.5  xfun_0.9          purrr_0.3.2      
-##  [4] splines_3.6.1     haven_2.1.1       lattice_0.20-38  
-##  [7] vctrs_0.2.0       htmltools_0.3.6   yaml_2.2.0       
-## [10] utf8_1.1.4        rlang_0.4.0       nloptr_1.2.1     
-## [13] pillar_1.4.2      foreign_0.8-71    glue_1.3.1       
-## [16] readxl_1.3.1      stringr_1.4.0     cellranger_1.1.0 
-## [19] zip_2.0.3         codetools_0.2-16  evaluate_0.14    
-## [22] knitr_1.24        rio_0.5.16        forcats_0.4.0    
-## [25] curl_4.0          fansi_0.4.0       Rcpp_1.0.2       
-## [28] backports_1.1.4   abind_1.4-5       hms_0.5.1        
-## [31] digest_0.6.20     stringi_1.4.3     openxlsx_4.1.0.1 
-## [34] grid_3.6.1        cli_1.1.0         tools_3.6.1      
-## [37] tibble_2.1.3      crayon_1.3.4      pkgconfig_2.0.2  
-## [40] zeallot_0.1.0     MASS_7.3-51.4     data.table_1.12.2
-## [43] assertthat_0.2.1  minqa_1.2.4       rmarkdown_1.15   
-## [46] R6_2.4.0          boot_1.3-22       nlme_3.1-140     
-## [49] compiler_3.6.1</code></pre>
+##  [1] nlme_3.1-148      tools_4.0.2       utf8_1.1.4        R6_2.4.1         
+##  [5] vegan_2.5-7       colorspace_1.4-1  DBI_1.1.0         mgcv_1.8-31      
+##  [9] permute_0.9-5     gridExtra_2.3     tidyselect_1.1.0  curl_4.3         
+## [13] compiler_4.0.2    cli_2.0.2         scales_1.1.1      stringr_1.4.0    
+## [17] digest_0.6.25     foreign_0.8-80    minqa_1.2.4       rmarkdown_2.3    
+## [21] rio_0.5.16        pkgconfig_2.0.3   htmltools_0.5.0   parallelly_1.28.1
+## [25] itertools_0.1-3   rlang_0.4.12      readxl_1.3.1      generics_0.0.2   
+## [29] zip_2.1.1         Rcpp_1.0.7        munsell_0.5.0     fansi_0.4.1      
+## [33] ape_5.4-1         abind_1.4-5       lifecycle_1.0.1   stringi_1.4.6    
+## [37] yaml_2.2.1        MASS_7.3-51.6     grid_4.0.2        blob_1.2.1       
+## [41] parallel_4.0.2    listenv_0.8.0     forcats_0.5.0     crayon_1.3.4     
+## [45] doSNOW_1.0.19     lattice_0.20-41   haven_2.3.1       splines_4.0.2    
+## [49] hms_0.5.3         knitr_1.29        rcdd_1.4          pillar_1.6.4     
+## [53] boot_1.3-25       codetools_0.2-16  fastmatch_1.1-0   magic_1.5-9      
+## [57] picante_1.8.2     glue_1.4.2        evaluate_0.14     data.table_1.13.0
+## [61] vctrs_0.3.8       nloptr_1.2.2.2    foreach_1.5.0     cellranger_1.1.0 
+## [65] gtable_0.3.0      assertthat_0.2.1  ggplot2_3.3.2     xfun_0.16        
+## [69] openxlsx_4.1.5    geometry_0.4.5    snow_0.4-4        iterators_1.0.12 
+## [73] cluster_2.1.0     globals_0.14.0    statmod_1.4.34    ellipsis_0.3.2</code></pre>
 </div>
 <div id="acknowledgements" class="section level1">
 <h1>Acknowledgements</h1>
-<p>Many thanks to the PREDICTS team, collaborators and data contributors. This work has been supported by the Natural Environment Research Council (NE/M014533/1), the National Council of Science &amp; Technology of Mexico (CONACyT) and the Prince Albert II of Monaco Foundation.</p>
-</div>
-<div id="how-to-cite" class="section level1">
-<h1>How to cite</h1>
-<p>De Palma A., Sanchez-Ortiz K. &amp; Purvis A. (2019) Calculating the Biodiversity Intactness Index: the PREDICTS implementation. doi: 10.5281/zenodo.3518067</p>
+<p>Many thanks to the PREDICTS team, collaborators and data contributors. In particular, we are grateful to Andrés Baselga for help deciding on a sensible compositional similarity measure and to Luca Börger for his ongoing advice on statistical modelling. This work has been supported by the Natural History Museum, the Natural Environment Research Council (NE/M014533/1), the National Council of Science &amp; Technology of Mexico (CONACyT) and the Prince Albert II of Monaco Foundation.</p>
 </div>
 
 
@@ -2286,7 +2345,7 @@ $(document).ready(function ()  {
       theme: "bootstrap3",
       context: '.toc-content',
       hashGenerator: function (text) {
-        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_').toLowerCase();
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
       },
       ignoreSelector: ".toc-ignore",
       scrollTo: 0

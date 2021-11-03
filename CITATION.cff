@@ -1,0 +1,27 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  Calculating the Biodiversity Intactness Index: the
+  PREDICTS implementation
+message: >-
+  This is the second release of a BII tutorial. The
+  document gives an example of how to model and
+  project the Biodiversity Intactness Index (BII)
+  using a subset of the PREDICTS (Projecting
+  Responses of Ecological Diversity in Changing
+  Terrestrial Systems) database and highlights some
+  of the advantages, extensions, assumptions and
+  limitations of the approaches used.
+type: software
+authors:
+  - given-names: Adriana
+    name-particle: De
+    family-names: Palma
+  - given-names: Katia
+    family-names: Sanchez-Ortiz
+  - given-names: Helen R.P.
+    family-names: Phillips
+  - given-names: Andy
+    family-names: Purvis

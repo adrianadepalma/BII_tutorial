@@ -1,8 +1,9 @@
 Calculating the Biodiversity Intactness Index: the PREDICTS
 implementation
 ================
-Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis
-24 October, 2019
+Adriana De Palma, Katia Sanchez-Ortiz, Helen R.P. Phillips and Andy
+Purvis
+03 November, 2021
 
   - [About PREDICTS](#about-predicts)
   - [About BII](#about-bii)
@@ -28,7 +29,6 @@ Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis
         answer](#bii-is-a-valuable-metric-but-isnt-the-only-answer)
   - [R Info](#r-info)
   - [Acknowledgements](#acknowledgements)
-  - [How to cite](#how-to-cite)
 
 This tutorial gives a step-by-step guide on how to calculate the
 Biodiversity Intactness Index (BII) using the PREDICTS database. We’ll
@@ -36,6 +36,13 @@ go through where to find the PREDICTS data, how we go about analysing
 this data and finally how to project and calculate BII, using `R`. We’ll
 be using just a subset of the data and a very simple model to start
 with.
+
+You can explore the results from our most up-to-date global models on
+the Natural History Museum’s [Biodiversity Trends
+Explorer](https://www.nhm.ac.uk/our-science/data/biodiversity-indicators/biodiversity-intactness-index-data?future-scenario=ssp2_rcp4p5_message_globiom&georegion=001&min-year=1970&max-year=2050&georegion-compare=null&show-uncertainty=true).
+This online tool allows users to explore historical and potential future
+trends in BII for different geographic units (e.g., countries, regions,
+global).
 
 # About PREDICTS
 
@@ -100,13 +107,13 @@ not be needed if representative long-term temporal data were available.
 
 Models can be fitted to the whole global data or to regions of
 particular interest (such as [tropical and subtropical forest
-biomes](https://www.biorxiv.org/content/10.1101/311688v3)). The models
+biomes](https://www.nature.com/articles/s41598-021-98811-1)). The models
 can be combined with detailed spatiotemporal data on the pressures [to
 map the projected current state of the response
 variable](https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638),
 [estimate how it has changed in the
-past](https://www.biorxiv.org/content/10.1101/311688v3), or [project its
-future under alternative
+past](https://www.nature.com/articles/s41598-021-98811-1), or [project
+its future under alternative
 scenarios](https://www.biorxiv.org/content/10.1101/311787v1).
 
 </details>
@@ -152,15 +159,18 @@ placed the world, nearly all biomes and nearly all biodiversity hotspots
 below the proposed ‘safe limit’ for BII.
 
 We have [continued to refine the modelling framework to improve our
-estimates of BII](https://www.biorxiv.org/content/10.1101/311688v3). The
-most important improvements since the 2016 paper have been:
+estimates of BII](https://www.nature.com/articles/s41598-021-98811-1).
+The most important improvements since the 2016 paper have been:
 
   - Use of a more stringent baseline in models of compositional
     similarity. Whereas the 2016 paper used all primary vegetation sites
     (even those with intense human use) as the baseline land use, growth
     of the database and a switch to a more efficient (matrix-based)
-    model framework have allowed us to use only minimally-used primary
-    vegetation as the baseline.
+    model framework have allowed us to use a more suitable baseline.
+    Depending on the analysis, this could include only minimally-used
+    primary vegetation as the baseline, or it could include a mixture of
+    minimally- and lightly-used primary vegetation as well as
+    minimally-used mature secondary vegetation.
   - A more principled transformation of the compositional similarity
     estimates prior to modelling. Although the log-transformation used
     in the 2016 paper produced acceptable model diagnostics, it does not
@@ -172,17 +182,27 @@ The estimates of BII that result from the improved framework tend to be
 [markedly lower than those we obtained
 in 2016](https://www.nature.com/articles/s41559-019-0896-0). One issue
 that remains to be addressed is that the land-use rasters we have been
-using to make spatial projections do not differentiate planted from
-natural forest, meaning our estimates are still likely to be too high in
-regions with extensive planted forest. Work to address this shortcoming
-is underway.
+using to make spatial projections do not accurately differentiate
+planted from natural forest, meaning our estimates are still likely to
+be too high in regions with extensive planted forest. Work to address
+this shortcoming is underway.
+
+More recently, we have begun to use a more conservative measure of
+compositional similarity. Our analyses previously used the asymmetric
+Jaccard Index, which considers only species identity, but not structure;
+for example, shifts in dominance. To account for changes in both species
+identity and community structure due to human activities, we have now
+implemented the [balanced Bray-Curtis
+index](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.12693).
+You’ll find more information about the differences between the indices
+below.
 
 BII, being an indicator of the average state of local ecological
 communities, complements indicators based on species’ global
-conservation status (such as the Red List Index), or on population
-trends (such as the Living Planet Index). These different facets of
-biodiversity are all important, and [can be combined to provide a
-roadmap towards restoring global
+conservation status (such as the Sampled Red List Index), or on
+population trends (such as the Living Planet Index). These different
+facets of biodiversity are all important, and [can be combined to
+provide a roadmap towards restoring global
 biodiversity](https://www.nature.com/articles/s41893-018-0130-0).
 
 </details>
@@ -192,13 +212,16 @@ biodiversity](https://www.nature.com/articles/s41893-018-0130-0).
 ``` r
 library(dplyr) # for easy data manipulation
 library(tidyr) # ditto
+library(tibble) # ditto
 library(magrittr) # for piping
 library(lme4) # for mixed effects models
 library(car) # for logit transformation with adjustment
+library(betapart) # for calculating balanced bray-curtis dissimilarity
 library(raster) # for working with raster data
 library(geosphere) # calculating geographic distance between sites
-library(foreach) # running loops
-library(doParallel) # running loops in parallel
+library(purrr) # running loops
+library(furrr) # running loops in parallel
+library(viridis) # figure colours for colour blindness
 ```
 
 # Prepare the biodiversity data
@@ -207,7 +230,7 @@ You can download the PREDICTS data from the
 <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural
 History Museum data portal<a/>. If you’re working in `R`, I would
 strongly suggest downloading `database.rds` (the database is very large,
-and the rds file is much quicker to load in than the csv file).
+and the .rds file is much quicker to load in than the .csv file).
 
 Once you’ve downloaded the database, read it in. I’m going to filter the
 data for just the Americas, to make the data manipulation and modelling
@@ -225,75 +248,75 @@ diversity <- readRDS("database.rds") %>%
 glimpse(diversity)
 ```
 
-    ## Observations: 825,682
-    ## Variables: 67
-    ## $ Source_ID                               <fct> AD1_2005__Shuler, AD1_...
-    ## $ Reference                               <fct> Shuler et al. 2005, Sh...
-    ## $ Study_number                            <int> 1, 1, 1, 1, 1, 1, 1, 1...
-    ## $ Study_name                              <fct> Shuler2005_flowervisit...
-    ## $ SS                                      <fct> AD1_2005__Shuler 1, AD...
-    ## $ Diversity_metric                        <fct> effort-corrected abund...
-    ## $ Diversity_metric_unit                   <fct> effort-corrected indiv...
-    ## $ Diversity_metric_type                   <fct> Abundance, Abundance, ...
-    ## $ Diversity_metric_is_effort_sensitive    <lgl> FALSE, FALSE, FALSE, F...
-    ## $ Diversity_metric_is_suitable_for_Chao   <lgl> FALSE, FALSE, FALSE, F...
-    ## $ Sampling_method                         <fct> systematic searching, ...
-    ## $ Sampling_effort_unit                    <fct> day, day, day, day, da...
-    ## $ Study_common_taxon                      <fct> Hymenoptera, Hymenopte...
-    ## $ Rank_of_study_common_taxon              <fct> Order, Order, Order, O...
-    ## $ Site_number                             <int> 1, 1, 1, 1, 1, 2, 2, 2...
-    ## $ Site_name                               <fct> Ayrshire Farms, Ayrshi...
-    ## $ Block                                   <fct> , , , , , , , , , , , ...
-    ## $ SSS                                     <fct> AD1_2005__Shuler 1 1, ...
-    ## $ SSB                                     <fct> AD1_2005__Shuler 1 , A...
-    ## $ SSBS                                    <fct> AD1_2005__Shuler 1  1,...
-    ## $ Sample_start_earliest                   <date> 2003-07-07, 2003-07-0...
-    ## $ Sample_end_latest                       <date> 2003-08-05, 2003-08-0...
-    ## $ Sample_midpoint                         <date> 2003-07-21, 2003-07-2...
-    ## $ Sample_date_resolution                  <fct> day, day, day, day, da...
-    ## $ Max_linear_extent_metres                <dbl> 2844.9464, 2844.9464, ...
-    ## $ Habitat_patch_area_square_metres        <dbl> 4046856.4, 4046856.4, ...
-    ## $ Sampling_effort                         <dbl> 1, 1, 1, 1, 1, 1, 1, 1...
-    ## $ Rescaled_sampling_effort                <dbl> 1, 1, 1, 1, 1, 1, 1, 1...
-    ## $ Habitat_as_described                    <fct> Squash or pumpkin farm...
-    ## $ Predominant_land_use                    <fct> Cropland, Cropland, Cr...
-    ## $ Source_for_predominant_land_use         <fct> Direct from publicatio...
-    ## $ Use_intensity                           <fct> Light use, Light use, ...
-    ## $ Km_to_nearest_edge_of_habitat           <dbl> NA, NA, NA, NA, NA, NA...
-    ## $ Years_since_fragmentation_or_conversion <dbl> NA, NA, NA, NA, NA, NA...
-    ## $ Transect_details                        <fct> , , , , , , , , , , , ...
-    ## $ Coordinates_method                      <fct> Direct from publicatio...
-    ## $ Longitude                               <dbl> -77.86848, -77.86848, ...
-    ## $ Latitude                                <dbl> 38.95733, 38.95733, 38...
-    ## $ Country_distance_metres                 <dbl> 0, 0, 0, 0, 0, 0, 0, 0...
-    ## $ Country                                 <fct> United States, United ...
-    ## $ UN_subregion                            <fct> North America, North A...
-    ## $ UN_region                               <fct> Americas, Americas, Am...
-    ## $ Ecoregion_distance_metres               <dbl> 0, 0, 0, 0, 0, 0, 0, 0...
-    ## $ Ecoregion                               <fct> Piedmont, Piedmont, Pi...
-    ## $ Biome                                   <fct> Temperate Broadleaf & ...
-    ## $ Realm                                   <fct> Nearctic, Nearctic, Ne...
-    ## $ Hotspot                                 <fct> , , , , , , , , , , , ...
-    ## $ Wilderness_area                         <fct> , , , , , , , , , , , ...
-    ## $ Taxon_number                            <int> 1, 2, 3, 4, 5, 1, 2, 3...
-    ## $ Taxon_name_entered                      <fct> Apis mellifera, Pepona...
-    ## $ Indication                              <fct> Hymenoptera: Apidae se...
-    ## $ Parsed_name                             <fct> Apis mellifera, Pepona...
-    ## $ Taxon                                   <fct> Apis mellifera, Pepona...
-    ## $ COL_ID                                  <int> 6845885, 6927991, 1302...
-    ## $ Name_status                             <fct> accepted name, accepte...
-    ## $ Rank                                    <fct> Species, Species, Fami...
-    ## $ Kingdom                                 <fct> Animalia, Animalia, An...
-    ## $ Phylum                                  <fct> Arthropoda, Arthropoda...
-    ## $ Class                                   <fct> Insecta, Insecta, Inse...
-    ## $ Order                                   <fct> Hymenoptera, Hymenopte...
-    ## $ Family                                  <fct> Apidae, Apidae, Halict...
-    ## $ Genus                                   <fct> Apis, Peponapis, , Mel...
-    ## $ Species                                 <fct> mellifera, pruinosa, ,...
-    ## $ Best_guess_binomial                     <fct> Apis mellifera, Pepona...
-    ## $ Higher_taxon                            <fct> Hymenoptera, Hymenopte...
-    ## $ Measurement                             <dbl> 0.00, 0.75, 0.00, 0.00...
-    ## $ Effort_corrected_measurement            <dbl> 0.00, 0.75, 0.00, 0.00...
+    ## Rows: 825,682
+    ## Columns: 67
+    ## $ Source_ID                               <fct> AD1_2005__Shuler, AD1_2005__Sh~
+    ## $ Reference                               <fct> Shuler et al. 2005, Shuler et ~
+    ## $ Study_number                            <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ~
+    ## $ Study_name                              <fct> "Shuler2005_flowervisitation",~
+    ## $ SS                                      <fct> AD1_2005__Shuler 1, AD1_2005__~
+    ## $ Diversity_metric                        <fct> effort-corrected abundance, ef~
+    ## $ Diversity_metric_unit                   <fct> effort-corrected individuals, ~
+    ## $ Diversity_metric_type                   <fct> Abundance, Abundance, Abundanc~
+    ## $ Diversity_metric_is_effort_sensitive    <lgl> FALSE, FALSE, FALSE, FALSE, FA~
+    ## $ Diversity_metric_is_suitable_for_Chao   <lgl> FALSE, FALSE, FALSE, FALSE, FA~
+    ## $ Sampling_method                         <fct> systematic searching, systemat~
+    ## $ Sampling_effort_unit                    <fct> day, day, day, day, day, day, ~
+    ## $ Study_common_taxon                      <fct> Hymenoptera, Hymenoptera, Hyme~
+    ## $ Rank_of_study_common_taxon              <fct> Order, Order, Order, Order, Or~
+    ## $ Site_number                             <int> 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, ~
+    ## $ Site_name                               <fct> "Ayrshire Farms", "Ayrshire Fa~
+    ## $ Block                                   <fct> , , , , , , , , , , , , , , , ~
+    ## $ SSS                                     <fct> AD1_2005__Shuler 1 1, AD1_2005~
+    ## $ SSB                                     <fct> AD1_2005__Shuler 1 , AD1_2005_~
+    ## $ SSBS                                    <fct> AD1_2005__Shuler 1  1, AD1_200~
+    ## $ Sample_start_earliest                   <date> 2003-07-07, 2003-07-07, 2003-~
+    ## $ Sample_end_latest                       <date> 2003-08-05, 2003-08-05, 2003-~
+    ## $ Sample_midpoint                         <date> 2003-07-21, 2003-07-21, 2003-~
+    ## $ Sample_date_resolution                  <fct> day, day, day, day, day, day, ~
+    ## $ Max_linear_extent_metres                <dbl> 2844.9464, 2844.9464, 2844.946~
+    ## $ Habitat_patch_area_square_metres        <dbl> 4046856.4, 4046856.4, 4046856.~
+    ## $ Sampling_effort                         <dbl> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ~
+    ## $ Rescaled_sampling_effort                <dbl> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ~
+    ## $ Habitat_as_described                    <fct> "Squash or pumpkin farm", "Squ~
+    ## $ Predominant_land_use                    <fct> Cropland, Cropland, Cropland, ~
+    ## $ Source_for_predominant_land_use         <fct> Direct from publication / auth~
+    ## $ Use_intensity                           <fct> Light use, Light use, Light us~
+    ## $ Km_to_nearest_edge_of_habitat           <dbl> NA, NA, NA, NA, NA, NA, NA, NA~
+    ## $ Years_since_fragmentation_or_conversion <dbl> NA, NA, NA, NA, NA, NA, NA, NA~
+    ## $ Transect_details                        <fct> "", "", "", "", "", "", "", ""~
+    ## $ Coordinates_method                      <fct> Direct from publication / auth~
+    ## $ Longitude                               <dbl> -77.86848, -77.86848, -77.8684~
+    ## $ Latitude                                <dbl> 38.95733, 38.95733, 38.95733, ~
+    ## $ Country_distance_metres                 <dbl> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ~
+    ## $ Country                                 <fct> "United States", "United State~
+    ## $ UN_subregion                            <fct> North America, North America, ~
+    ## $ UN_region                               <fct> Americas, Americas, Americas, ~
+    ## $ Ecoregion_distance_metres               <dbl> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ~
+    ## $ Ecoregion                               <fct> "Piedmont", "Piedmont", "Piedm~
+    ## $ Biome                                   <fct> "Temperate Broadleaf & Mixed F~
+    ## $ Realm                                   <fct> Nearctic, Nearctic, Nearctic, ~
+    ## $ Hotspot                                 <fct> , , , , , , , , , , , , , , , ~
+    ## $ Wilderness_area                         <fct> , , , , , , , , , , , , , , , ~
+    ## $ Taxon_number                            <int> 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, ~
+    ## $ Taxon_name_entered                      <fct> "Apis mellifera", "Peponapis p~
+    ## $ Indication                              <fct> "Hymenoptera: Apidae sensu lat~
+    ## $ Parsed_name                             <fct> "Apis mellifera", "Peponapis p~
+    ## $ Taxon                                   <fct> Apis mellifera, Peponapis prui~
+    ## $ COL_ID                                  <int> 6845885, 6927991, 13025322, 69~
+    ## $ Name_status                             <fct> accepted name, accepted name, ~
+    ## $ Rank                                    <fct> Species, Species, Family, Spec~
+    ## $ Kingdom                                 <fct> Animalia, Animalia, Animalia, ~
+    ## $ Phylum                                  <fct> Arthropoda, Arthropoda, Arthro~
+    ## $ Class                                   <fct> Insecta, Insecta, Insecta, Ins~
+    ## $ Order                                   <fct> Hymenoptera, Hymenoptera, Hyme~
+    ## $ Family                                  <fct> Apidae, Apidae, Halictidae, Ap~
+    ## $ Genus                                   <fct> Apis, Peponapis, , Melissodes,~
+    ## $ Species                                 <fct> mellifera, pruinosa, , bimacul~
+    ## $ Best_guess_binomial                     <fct> Apis mellifera, Peponapis prui~
+    ## $ Higher_taxon                            <fct> Hymenoptera, Hymenoptera, Hyme~
+    ## $ Measurement                             <dbl> 0.00, 0.75, 0.00, 0.00, 0.00, ~
+    ## $ Effort_corrected_measurement            <dbl> 0.00, 0.75, 0.00, 0.00, 0.00, ~
 
 [This paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303)
 describes the PREDICTS database structure and content. Briefly, the
@@ -312,29 +335,29 @@ table(diversity$Predominant_land_use, diversity$Use_intensity)
 ```
 
     ##                                           
-    ##                                            Minimal use Light use
-    ##   Primary vegetation                            163302     73282
-    ##   Young secondary vegetation                     36731      9427
-    ##   Intermediate secondary vegetation              51349     12968
-    ##   Mature secondary vegetation                    39909      5936
-    ##   Secondary vegetation (indeterminate age)       44260     10349
-    ##   Plantation forest                               9046     18478
-    ##   Pasture                                        38321     93577
-    ##   Cropland                                       13184     37887
-    ##   Urban                                           7431      5547
-    ##   Cannot decide                                      0         0
+    ##                                            Minimal use Light use Intense use
+    ##   Primary vegetation                            163302     73282       22783
+    ##   Young secondary vegetation                     36731      9427        3673
+    ##   Intermediate secondary vegetation              51349     12968        1041
+    ##   Mature secondary vegetation                    39909      5936         396
+    ##   Secondary vegetation (indeterminate age)       44260     10349         373
+    ##   Plantation forest                               9046     18478        9429
+    ##   Pasture                                        38321     93577        2612
+    ##   Cropland                                       13184     37887       18751
+    ##   Urban                                           7431      5547        1772
+    ##   Cannot decide                                      0         0           0
     ##                                           
-    ##                                            Intense use Cannot decide
-    ##   Primary vegetation                             22783         12828
-    ##   Young secondary vegetation                      3673          7467
-    ##   Intermediate secondary vegetation               1041          5135
-    ##   Mature secondary vegetation                      396          2814
-    ##   Secondary vegetation (indeterminate age)         373          5407
-    ##   Plantation forest                               9429          2985
-    ##   Pasture                                         2612         29274
-    ##   Cropland                                       18751         24188
-    ##   Urban                                           1772           332
-    ##   Cannot decide                                      0          3438
+    ##                                            Cannot decide
+    ##   Primary vegetation                               12828
+    ##   Young secondary vegetation                        7467
+    ##   Intermediate secondary vegetation                 5135
+    ##   Mature secondary vegetation                       2814
+    ##   Secondary vegetation (indeterminate age)          5407
+    ##   Plantation forest                                 2985
+    ##   Pasture                                          29274
+    ##   Cropland                                         24188
+    ##   Urban                                              332
+    ##   Cannot decide                                     3438
 
 There’s lots of data for the Americas across all land-use and intensity
 classes. Since we’re using a simplified model for illustration purposes,
@@ -428,19 +451,49 @@ where the sampling effort does not vary among sites.
 
 ## Compositional Similarity
 
-We use the *asymmetric Jaccard Index* as our measure of compositional
-similarity. Essentially, we want to know what species are present in our
-baseline sites (`Primary minimal`), and then for our converted sites
-(all other land uses), what proportion of individuals come from species
-that are also found in the baseline site.
+Up until recently, we used the *asymmetric Jaccard Index* as our measure
+of compositional similarity. Essentially, we wanted to know what species
+are present in our baseline sites (`Primary minimal`), and then for our
+converted sites (all other land uses), what proportion of individuals
+come from species that are also found in the baseline site. We’re now
+using a more sensitive measure of compositional similarity – *balanced
+Bray-Curtis* – that considers changes in community structure, rather
+than just identiy.
 
-As an example, let’s look at the following simple scenario. Our primary
-minimal site had 15 *Species A* individuals and 30 *Species B*
-individuals. A cropland site has 10 *Species A* and 40 *Species C*
-individuals. The compositional similarity measure that we use currently
-would say that only 10 out of a total 50 individuals in the cropland
-site were from *originally present species* (i.e. *Species A*): a value
-of 0.2.
+Let’s take a look at a couple of examples to illustrate the differences
+between these two measures of compositional similarity.
+
+*Example 1:*
+
+| Site                    | Species A | Species B | Species C | Species D |
+| :---------------------- | :-------: | :-------: | :-------: | :-------: |
+| Site 1: Primary minimal |    35     |    15     |     0     |     0     |
+| Site 2: Cropland        |    15     |    35     |     0     |     0     |
+
+Here we’ve got no new species and no changes in abundance, but the
+dominance structure has totally changed – Species A is the most dominant
+in Site 1, but Species B is most dominant in Site 2. The *asymmetric
+Jaccard Index* would say that these sites have a similarity of 1,
+because there are no novel species (100% of the individuals come from
+‘originally-present species’). Our new measure, however, would say
+that there is a similarity of 0.6, because there has been a change in
+community structure.
+
+*Example 2:*
+
+| Site                    | Species A | Species B | Species C | Species D |
+| :---------------------- | :-------: | :-------: | :-------: | :-------: |
+| Site 1: Primary minimal |    35     |    24     |     0     |     1     |
+| Site 2: Cropland        |    10     |     0     |    45     |     5     |
+
+In this example, we’ve got some new species in the Cropland site, a
+shift in dominance (Species A is the most dominant in Primary minimal,
+but not in Cropland), but the same overall abundance in both sites.
+
+When we calculate the compositional similarity using our previous
+measure, we get a value of 0.25 (because 15 out of the 60 individuals in
+Site 2 were also present in Site 1), but with our new measure, we get a
+value of 0.18.
 
 Now, for every study with a `Primary minimal` site, we want to calculate
 this compositional similarity measure against every other site in the
@@ -490,106 +543,78 @@ cd_data_input <- diversity %>%
 ```
 
 Now we’ll set up a function to calculate compositional similarity
-between a single pair of sites in a study.
+between a single pair of sites in a study (See the previous version of
+this walkthrough for the function for calculating the asymmetrical
+Jaccard’s similarity).
 
 ``` r
-getJacAbSym <- function(s1, s2, data){
-
-  # get the list of species that are present in site 1 (i.e., their abundance was greater than 0)
-  s1species <- data %>%
-    
-    # filter out the SSBS that matches s1
-    filter(SSBS == s1) %>%
-    
-    # filter out the species where the Measurement (abundance) is greater than 0
-    filter(Measurement > 0) %>%
-    
-    # get the unique species from this dataset
-    distinct(Taxon_name_entered) %>%
-    
-    # pull out the column into a vector
-    pull
+get_bray <- function(s1, s2, data){
   
-  # for site 2, get the total abundance of species that are also present in site 1
+  require(betapart)
   
-  s2abundance_s1species <- data %>%
+  sp_data <- data %>%
     
-    # filter out the SSBS that matches s2
-    filter(SSBS == s2) %>%
+    # filter out the SSBS that matches the pair of sites we're interested in
+    filter(SSBS %in% c(s1, s2)) %>%
     
-    # filter out the species that are also present in site 1
-    filter(Taxon_name_entered %in% s1species) %>%
+    # pull out the site name, species name and abundance information
+    dplyr::select(SSBS, Taxon_name_entered, Measurement) %>%
     
-    # pull out the Measurement into a vector
-    pull(Measurement) %>%
+    # pivot so that each column is a species and each row is a site
+    pivot_wider(names_from = Taxon_name_entered, values_from = Measurement) %>%
     
-    # calculate the sum
-    sum()
+    # set the rownames to the SSBS and then remove that column
+    column_to_rownames("SSBS")
   
-  # calculate the total abundance of all species in site 2
-  s2_sum <- data %>%
-    
-    # filter out the SSBS that matches s2
-    filter(SSBS == s2) %>%
-    
-    # pull out the measurement column (the abundance)
-    pull(Measurement) %>%
-    
-    # calculate the sum
-    sum() 
-  
-  
-  # Now calculate the compositional similarity
-  # this is the number of individuals of species also found in s1, divided by the total abundance in s2 
-  # so that equates to the proportion of individuals in s2 that are of species also found in s1
-  
-  sor <- s2abundance_s1species / s2_sum
-
-  
-  # if there are no taxa in common, then sor = 0
-  # if abundances of all taxa are zero, then similarity becomes NaN.
-  return(sor)
-  
+  # if one of the sites doesn't have any individuals in it
+  # i.e. the row sum is 0
+  if(sum(rowSums(sp_data) == 0, na.rm = TRUE) == 1){
+    # then the similarity between sites should be 0
+    bray <- 0
+  # if both sites have no individuals
+  }else if(sum(rowSums(sp_data) == 0, na.rm = TRUE) == 2){
+    # then class the similarity as NA
+    bray <- NA
+  # otherwise if both sites have individuals, calculate the balanced bray-curtis
+  # as similarity (1-bray)
+  }else{
+    bray <- 1 - 
+      bray.part(sp_data) %>%
+      pluck("bray.bal") %>%
+      pluck(1)
   }
+  
+}
 ```
 
-Now that we’ve set up all the functions to gather the data for the
-compositional similarity models, let’s get the dataset. We’ll first get
-together a vector of all the study IDs that we need to perform the
-calculations for.
+Now that we’ve got the function to gather the data for the compositional
+similarity models, let’s get the dataset. We’ll first get together a
+vector of all the study IDs that we need to perform the calculations
+for.
 
 ``` r
 # get a vector of each study to loop over
-studies <- distinct(cd_data_input, SS) %>%
+studies <- cd_data_input %>%
+  distinct(SS) %>%
   pull()
 ```
 
-Now we have to loop over each element in `studies` and calculate:
-
-1.  the compositional similarity between each pair of sites
-2.  the geographic distance between each pair of sites
-3.  the land uses for each pair of sites
-
-I’m going to do this in parallel, as we’re looping over a lot of
-studies.
+Next, get all the site comparisons for each study. We’re using the
+`purrr:map` function here which will loop over each study in turn and
+perform the custom function we’ve specified. Note that we’re using
+`map_dfr` because at the end, I’d like a dataframe where each row gives
+the pair of sites that need comparing.
 
 ``` r
-registerDoParallel(cores = 2)
-
-# If you're not familiar with loops (or with foreach loops):
-# I'm going to loop over every element (s) in studies and combine the results of each loop by rbinding them into one large dataset. Since we're using functions from different packages within this loop, we need to specify them (if you don't do the loop in parallel, this isn't necessary)
-cd_data <- foreach(s = studies, 
-                   .combine = rbind,
-                   .packages = c("dplyr", "magrittr", "geosphere")) %dopar% {
+site_comparisons <- map_dfr(.x = studies, .f = function(x){
   
   # filter out the given study
-  data_ss <- filter(cd_data_input, SS == s)
-  
-  # pull out the SSBS and LandUse information (we'll use this later to assign a land use contrast to each pair of site
-  site_data <- data_ss %>%
+  site_data <- filter(cd_data_input, SS == x) %>%
+    # pull out the SSBS and LandUse information
     dplyr::select(SSBS, LandUse) %>%
+    # simplify the data so we only have one row for each site
     distinct(SSBS, .keep_all = TRUE)
-  
+
   # pull out the sites that are Primary minimal (we only want to use comparisons with the baseline)
   baseline_sites <- site_data %>%
     filter(LandUse == "Primary minimal") %>%
@@ -599,7 +624,6 @@ cd_data <- foreach(s = studies,
   site_list <- site_data %>%
     pull(SSBS)
   
-
   # get all site x site comparisons for this study
   site_comparisons <- expand.grid(baseline_sites, site_list) %>%
     
@@ -607,40 +631,89 @@ cd_data <- foreach(s = studies,
     rename(s1 = Var1, s2 = Var2) %>%
     
     # remove the comparisons where the same site is being compared to itself
-    filter(s1 != s2)
+    filter(s1 != s2) %>%
     
+    # make the values characters rather than factors
+    mutate(s1 = as.character(s1),
+           s2 = as.character(s2),
+           
+           # add the full name
+           contrast = paste(s1, "vs", s2, sep = "_"),
+           
+           # add the study id
+           SS = as.character(x))
   
-  # apply the compositional similarity function over each site combination in the dataset
-  sor <- apply(site_comparisons, 1, function(y) getJacAbSym(data = data_ss, s1 = y['s1'], s2 = y['s2']))
-  
-  # calculate the geographic distance between sites
-  # first pull out the lat and longs for each site combination
-  s1LatLong <- as.matrix(data_ss[match(site_comparisons$s1, data_ss$SSBS), c('Longitude','Latitude')])
-  s2LatLong <- as.matrix(data_ss[match(site_comparisons$s2, data_ss$SSBS), c('Longitude','Latitude')])
+  return(site_comparisons)
+})
+```
 
-  # then calculate the distance between sites
-  dist <- distHaversine(s1LatLong, s2LatLong)
+For each study and set of comparisons, we need to calculate the
+compositional similarity. We’re going to set this up to run in parallel.
+I’m using the `purrr::map` functions here (made to run in parallel using
+the `furrr` package), but there are other options, like `for` loops or
+`apply`.
 
-  # pull out the land-use contrast for those site combinations
-  Contrast <- paste(site_data$LandUse[match(site_comparisons$s1, site_data$SSBS)],
-                    site_data$LandUse[match(site_comparisons$s2, site_data$SSBS)], 
-                    sep = "-")
-  
-  # put all the information into a single dataframe
-  
-  study_results <- data.frame(site_comparisons,
-                              sor,
-                              dist,
-                              Contrast,
-                              SS = s,
-                              stringsAsFactors = TRUE)
+``` r
+future::plan(multisession, workers = 4)
 
-  
-  
-}
+# I'm using map2 (because there are two arguments I'm passing through - s1 and s2)
+# and the map2_dbl because the output I want is a vector of numbers (double rather than integer format)
+# so this function is going to go through each s1 and s2 in turn
+# and pass them into the get_bray function
+bray <- future_map2_dbl(.x = site_comparisons$s1,
+                        .y = site_comparisons$s2,
+                        ~get_bray(s1 = .x, s2 = .y, data = cd_data_input))
 
-# stop running things in parallel
-registerDoSEQ()
+# stop running things in parallel for now
+future::plan(sequential)
+```
+
+Next we’ll pull out the additional data we need (which don’t require a
+loop), including the geographic distance between sites and the land
+uses.
+
+``` r
+# for the other required information, we don't need to run loops
+latlongs <- cd_data_input %>%
+  # for each site in the dataset
+  group_by(SSBS) %>%
+  # pull out the lat and long
+  summarise(Lat = unique(Latitude),
+            Long = unique(Longitude))
+
+lus <- cd_data_input %>%
+  # for each site in the dataset
+  group_by(SSBS) %>%
+  # pull out the land use
+  summarise(lu = unique(LandUse))
+```
+
+Let’s put all the data together into a dataset we can use for modelling.
+
+``` r
+# now let's put all the data together
+cd_data <- site_comparisons %>%
+  # add in the bray-curtis data
+  # which is already in the same order as site_comparisons
+  mutate(bray = bray) %>%
+  # get the lat and long for s1
+  left_join(latlongs, by = c("s1" = "SSBS")) %>%
+  rename(s1_lat = Lat,
+         s1_long = Long) %>%
+  # get the lat and long for s2
+  left_join(latlongs, by = c("s2" = "SSBS")) %>%
+  rename(s2_lat = Lat,
+         s2_long = Long) %>%
+  # calculate the geographic distances between s1 and s2 sites
+  mutate(geog_dist = distHaversine(cbind(s1_long, s1_lat), cbind(s2_long, s2_lat))) %>%
+  # get the land use for s1
+  left_join(lus, by = c("s1" = "SSBS")) %>%
+  rename(s1_lu = lu) %>%
+  # get the land use for s2
+  left_join(lus, by = c("s2" = "SSBS")) %>%
+  rename(s2_lu = lu) %>%
+  # create an lu_contrast column (what we'll use for modelling)
+  mutate(lu_contrast = paste(s1_lu, s2_lu, sep = "_vs_"))
 ```
 
 # Run the statistical analysis
@@ -723,98 +796,100 @@ Now let’s do a model of compositional similarity. For compositional
 similarity models, we include a measure of the geographic distance
 beween sites. This allows us to discount *natural* turnover in species
 with distance. You can also include environmental distance (we’ve done
-this previously based on Gower’s dissimilarity of climatic variables)
-and additional human pressures in models like this.
+this previously based on Gower’s dissimilarity of climatic variables).
+You might also want to include additional pressure variables in the
+compositional similarity model, such as human population density and
+road density. We usually do this by including the pressure at site 2
+(the non-baseline site) as well as the *difference* in pressure between
+site 1 and site 2.
 
 The compositional similarity measure we use is bounded between 0 and 1 –
 this means the errors will probably not be normally distributed.
 Although log-transformation produced models with acceptable diagnostics,
 it doesn’t respect the boundedness of the compositional similarity
 measure. We’ve found that a logit transformation (with an adjustment to
-account for 0s and 1s), which does recognise the boundedness, also gives
-acceptable diagnostics.
+account for 0s and 1s) also gives acceptable diagnostics and is
+conceptually more appropriate as it does recognise the boundedness of
+the data.
 
 ``` r
 # there is some data manipulation we want to do before modelling
 cd_data <- cd_data %>%
   
-  # Firstly, we only care about comparisons where Primary minimal is the first site
-  # so pull the contrast apart
-  separate(Contrast, c("s1_LandUse", "s2_LandUse"), sep = "-", remove = FALSE) %>%
-  
-  # filter sites where s1_LandUse is the baseline site
-  filter(s1_LandUse == "Primary minimal") %>%
-  
   # logit transform the compositional similarity
-  mutate(logitCS = logit(sor, adjust = 0.001, percents = FALSE)) %>%
+  mutate(logitCS = logit(bray, adjust = 0.001, percents = FALSE)) %>%
   
   # log10 transform the geographic distance between sites
-  mutate(log10geo = log10(dist + 1)) %>%
+  mutate(log10geo = log10(geog_dist + 1)) %>%
   
   # make primary minimal-primary minimal the baseline again
-  mutate(Contrast = factor(Contrast), 
-         Contrast = relevel(Contrast, ref = "Primary minimal-Primary minimal"))
+  mutate(lu_contrast = factor(lu_contrast), 
+         lu_contrast = relevel(lu_contrast, ref = "Primary minimal_vs_Primary minimal"))
 
 
 # Model compositional similarity as a function of the land-use contrast and the geographic distance between sites
-cd_m <- lmer(logitCS ~ Contrast + log10geo + (1|SS), data = cd_data)
+cd_m <- lmer(logitCS ~ lu_contrast + log10geo + (1|SS) + (1|s2), data = cd_data)
 summary(cd_m)
 ```
 
     ## Linear mixed model fit by REML ['lmerMod']
-    ## Formula: logitCS ~ Contrast + log10geo + (1 | SS)
+    ## Formula: logitCS ~ lu_contrast + log10geo + (1 | SS) + (1 | s2)
     ##    Data: cd_data
     ## 
-    ## REML criterion at convergence: 757398.2
+    ## REML criterion at convergence: 761577.7
     ## 
     ## Scaled residuals: 
     ##     Min      1Q  Median      3Q     Max 
-    ## -2.9033 -0.7263  0.0671  0.5304  3.7308 
+    ## -4.6947 -0.4063 -0.0026  0.4115  4.9909 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
-    ##  SS       (Intercept) 6.469    2.544   
-    ##  Residual             9.423    3.070   
-    ## Number of obs: 148985, groups:  SS, 95
+    ##  s2       (Intercept) 2.257    1.502   
+    ##  SS       (Intercept) 4.446    2.109   
+    ##  Residual             7.699    2.775   
+    ## Number of obs: 154482, groups:  s2, 3452; SS, 89
     ## 
     ## Fixed effects:
-    ##                                              Estimate Std. Error t value
-    ## (Intercept)                                   2.33360    0.28152   8.289
-    ## ContrastPrimary minimal-Primary vegetation   -0.32459    0.03191 -10.171
-    ## ContrastPrimary minimal-Urban                -1.66278    0.04343 -38.285
-    ## ContrastPrimary minimal-Pasture              -1.90225    0.03146 -60.468
-    ## ContrastPrimary minimal-Secondary vegetation  0.10686    0.03659   2.920
-    ## ContrastPrimary minimal-Plantation forest    -0.45909    0.07290  -6.297
-    ## ContrastPrimary minimal-Cropland             -1.20430    0.04511 -26.699
-    ## log10geo                                     -0.28403    0.01069 -26.563
+    ##                                                     Estimate Std. Error t value
+    ## (Intercept)                                         0.716768   0.248564   2.884
+    ## lu_contrastPrimary minimal_vs_Cropland             -1.373285   0.163055  -8.422
+    ## lu_contrastPrimary minimal_vs_Pasture              -2.045541   0.106321 -19.239
+    ## lu_contrastPrimary minimal_vs_Plantation forest    -0.342362   0.170453  -2.009
+    ## lu_contrastPrimary minimal_vs_Primary vegetation   -0.251758   0.106679  -2.360
+    ## lu_contrastPrimary minimal_vs_Secondary vegetation -0.099924   0.101406  -0.985
+    ## lu_contrastPrimary minimal_vs_Urban                -1.493001   0.185705  -8.040
+    ## log10geo                                           -0.164548   0.009637 -17.075
     ## 
     ## Correlation of Fixed Effects:
-    ##             (Intr) CPm-Pv CnPm-U CnPm-P CPm-Sv CPm-Pf CnPm-C
-    ## CntrstPm-Pv -0.026                                          
-    ## CntrstPmn-U -0.005  0.285                                   
-    ## CntrstPmn-P -0.022  0.296  0.164                            
-    ## CntrstPm-Sv -0.043  0.238  0.120  0.286                     
-    ## CntrstPm-Pf -0.038  0.172  0.109  0.118  0.165              
-    ## CntrstPmn-C -0.016  0.213  0.237  0.147  0.222  0.091       
-    ## log10geo    -0.138 -0.046 -0.103 -0.056 -0.035 -0.012 -0.037
+    ##             (Intr) l_Pm__C l_Pm__P l_Pm_f l_Pm__Pv l_Pm__Sv l_Pm__U
+    ## l_cntrPm__C -0.068                                                 
+    ## l_cntrPm__P -0.107  0.146                                          
+    ## l_cntPm__Pf -0.110  0.088   0.163                                  
+    ## l_cntPm__Pv -0.114  0.184   0.294   0.233                          
+    ## l_cntPm__Sv -0.150  0.219   0.326   0.223  0.289                   
+    ## l_cntrPm__U -0.063  0.185   0.124   0.088  0.229    0.109          
+    ## log10geo    -0.139 -0.014  -0.020  -0.006 -0.021   -0.018   -0.022
 
 Note that you can’t trust the significance values of these compositional
 similarity values. The same site goes into multiple comparisons in the
 model (each Primary minimal site is compared to all other sites in the
-study), which will inflate the p-values. If you want to look at
-significance values, you’ll need to use permutation tests in order to
-see which effects are significant. We’re not going to do that here
-because they can take a while.
+study), which will inflate the p-values. We’ve added in a random
+intercept for site 2 (`s2`) to try to account for this, but really if
+you want to look at significance values, you’ll need to use permutation
+tests in order to see which effects are significant. We’re not going to
+do that here because they can take a while.
 
 # Projecting the model
 
 Now we have one model (`ab_m`) telling us how land-use change influences
-the total abundance of species and one model (`cs_m`) that tells us what
-proportion of those individuals are from ‘originally present species’ in
-a community. Multiplying these together gives us the BII: the abundance
-of originally present species. We do this by projecting abundance and
-compositional similarity onto rasters of pressure data, and then
-multiplying the two output maps together.
+the total abundance of species and one model (`cs_m`) that tells how
+similar the community structure is. Multiplying these together gives us
+the BII: the intactness of nature in the system. We do this by
+projecting abundance and compositional similarity onto rasters of
+pressure data, and then multiplying the two output maps together. You
+can use python to project predicts-style models ([See here for the
+code](https://github.com/ricardog/raster-project)), but let’s do it
+using R so you can see step-by-step exactly what’s happening.
 
 ## Model predictions
 
@@ -846,8 +921,8 @@ inv_logit <- function(f, a){
 
 # once again, set up the dataframe with all the levels you want to predict diversity for
 # because we had an extra fixed effect in this model (log10geo), we also have to set a baseline level for this
-# we'll set it to 0 because we're interested in the compositional similarity when distance between sites is 0 (i.e., when distance-based turnover is discounted, what is the turnover because of land use?)
-newdata_cd <- data.frame(Contrast = levels(cd_data$Contrast),
+# We're interested in the compositional similarity when we discount natural turnover, so we want to set this to a static value. We'll use 0 here, but we can also set it to the median geographic distance in the original data or any other meaningful level.
+newdata_cd <- data.frame(lu_contrast = levels(cd_data$lu_contrast),
                       log10geo = 0) %>%
   mutate(cd_m_preds = predict(cd_m, ., re.form = NA) %>%
            inv_logit(a = 0.001))
@@ -870,9 +945,9 @@ You can use any land-use data you like, but many land-use maps don’t
 have classes that map easily onto the definitions used by PREDICTS.
 Notable exceptions are land-use maps developed for the Representative
 Concentration Pathways
-(<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>),
-because PREDICTS land-use classes were designed with these maps in mind,
-and the derived fine-resolution product developed by
+(<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>)
+– because PREDICTS land-use classes were designed with these maps in
+mind – and the derived fine-resolution product developed by
 <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
 
 I’m just going to simulate some rasters here for ease.
@@ -882,8 +957,7 @@ each land-use class, and the cell value is the proportion of the cell
 assigned to that land-use class. We’ll generate some random numbers for
 each of the land uses – let’s make it mostly cropland, with a fair chunk
 of pasture and secondary vegetation, with just patches of natural land
-and urban
-areas.
+and urban areas.
 
 ``` r
 # generate a dataframe with random numbers for the cell values for each land-use class
@@ -938,10 +1012,10 @@ For example, here’s the raster showing the amount of urban land in each
 cell:
 
 ``` r
-plot(urb_raster)
+plot(urb_raster, col = viridis(20))
 ```
 
-![](bii_example_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](bii_example_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ## Spatial projections of BII
 
@@ -963,16 +1037,16 @@ ab_raster <- (newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary minimal'] * p
   newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary minimal']
 
 
-cd_raster <- (newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary minimal'] * pri_min_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary vegetation'] * pri_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Plantation forest'] * plant_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Secondary vegetation'] * sec_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Cropland'] * crop_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Pasture'] * pas_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Urban'] * urb_raster) /
+cd_raster <- (newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Primary minimal'] * pri_min_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Primary vegetation'] * pri_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Plantation forest'] * plant_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Secondary vegetation'] * sec_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Cropland'] * crop_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Pasture'] * pas_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Urban'] * urb_raster) /
   
   # divide by the reference value
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary minimal']
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Primary minimal']
 ```
 
 The final step is to multiply the abundance and compositional similarity
@@ -981,13 +1055,13 @@ expressed as a percentage rather than a proportion.
 
 ``` r
 bii <- ab_raster * cd_raster
-plot(bii * 100)
+plot(bii * 100, col = viridis(20))
 ```
 
-![](bii_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](bii_example_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 Once you have your map of BII, you can calculate the average value
-across any spatial scale. The average BII across this map is 80.89.
+across any spatial scale. The average BII across this map is 57.43.
 
 And that is it. A quick walkthrough of how we use the PREDICTS database
 to model and project the Biodiversity Intactness Index.
@@ -1036,7 +1110,9 @@ alien in the PREDICTS database. For island communities where we can
 distinguish native species from alien species, we are working to compare
 BII as calculated above (with an abundance model and compositional
 similarity model) with BII modeled as the abundance of native species
-only (with an abundance model of *only* native species).
+only (with an abundance model of *only* native species)([See
+here](https://www.biorxiv.org/content/10.1101/2019.12.16.878041v1) for
+some of the results of this work).
 
 # Advantages
 
@@ -1096,6 +1172,18 @@ pixel is not really advisable. Instead, the maps are more likely to be
 reliable when looking over broader areas and larger time steps, rather
 than pixel by pixel and year by year.
 
+Note that on the Natural History Museum’s [Biodiversity Trends
+Explorer](https://www.nhm.ac.uk/our-science/data/biodiversity-indicators/biodiversity-intactness-index-data?future-scenario=ssp2_rcp4p5_message_globiom&georegion=001&min-year=1970&max-year=2050&georegion-compare=null&show-uncertainty=true),
+we’ve used cross-validation to produce upper and lower uncertainty
+bounds on the projections. We have refit the models leaving one biome
+out in turn, and then projected BII from these models; the highest and
+lowest projections in the set provide some uncertainty bounds. It is
+important to note, however, that these bounds only include some of the
+many sources uncertainty (mainly stemming from geographic bias in the
+underlying dataset and uncertainty in model fitting), so more work still
+needs to be done to effectively calculate and communicate uncertainty in
+our projections.
+
 ## BII is a valuable metric, but isn’t the only answer
 
 BII is a measure of ecosystem intactness, but we do not expect it to be
@@ -1112,9 +1200,9 @@ indicators based on extinction risk and population decline.
 utils::sessionInfo()
 ```
 
-    ## R version 3.6.1 (2019-07-05)
+    ## R version 4.0.2 (2020-06-22)
     ## Platform: x86_64-w64-mingw32/x64 (64-bit)
-    ## Running under: Windows 7 x64 (build 7601) Service Pack 1
+    ## Running under: Windows 10 x64 (build 19043)
     ## 
     ## Matrix products: default
     ## 
@@ -1126,44 +1214,42 @@ utils::sessionInfo()
     ## [5] LC_TIME=English_United Kingdom.1252    
     ## 
     ## attached base packages:
-    ## [1] parallel  stats     graphics  grDevices utils     datasets  methods  
-    ## [8] base     
+    ## [1] stats     graphics  grDevices utils     datasets  methods   base     
     ## 
     ## other attached packages:
-    ##  [1] doParallel_1.0.15 iterators_1.0.12  foreach_1.4.7    
-    ##  [4] geosphere_1.5-10  raster_3.0-2      sp_1.3-1         
-    ##  [7] car_3.0-3         carData_3.0-2     lme4_1.1-21      
-    ## [10] Matrix_1.2-17     magrittr_1.5      tidyr_0.8.3      
-    ## [13] dplyr_0.8.3      
+    ##  [1] viridis_0.5.1     viridisLite_0.3.0 furrr_0.2.3       future_1.23.0    
+    ##  [5] purrr_0.3.4       geosphere_1.5-10  raster_3.3-13     sp_1.4-2         
+    ##  [9] betapart_1.5.4    car_3.0-9         carData_3.0-4     lme4_1.1-23      
+    ## [13] Matrix_1.2-18     magrittr_1.5      tibble_3.0.3      tidyr_1.1.1      
+    ## [17] dplyr_1.0.7      
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] tidyselect_0.2.5  xfun_0.9          purrr_0.3.2      
-    ##  [4] splines_3.6.1     haven_2.1.1       lattice_0.20-38  
-    ##  [7] vctrs_0.2.0       htmltools_0.3.6   yaml_2.2.0       
-    ## [10] utf8_1.1.4        rlang_0.4.0       nloptr_1.2.1     
-    ## [13] pillar_1.4.2      foreign_0.8-71    glue_1.3.1       
-    ## [16] readxl_1.3.1      stringr_1.4.0     cellranger_1.1.0 
-    ## [19] zip_2.0.3         codetools_0.2-16  evaluate_0.14    
-    ## [22] knitr_1.24        rio_0.5.16        forcats_0.4.0    
-    ## [25] curl_4.0          fansi_0.4.0       Rcpp_1.0.2       
-    ## [28] backports_1.1.4   abind_1.4-5       hms_0.5.1        
-    ## [31] digest_0.6.20     stringi_1.4.3     openxlsx_4.1.0.1 
-    ## [34] grid_3.6.1        cli_1.1.0         tools_3.6.1      
-    ## [37] tibble_2.1.3      crayon_1.3.4      pkgconfig_2.0.2  
-    ## [40] zeallot_0.1.0     MASS_7.3-51.4     data.table_1.12.2
-    ## [43] assertthat_0.2.1  minqa_1.2.4       rmarkdown_1.15   
-    ## [46] R6_2.4.0          boot_1.3-22       nlme_3.1-140     
-    ## [49] compiler_3.6.1
+    ##  [1] nlme_3.1-148      tools_4.0.2       utf8_1.1.4        R6_2.4.1         
+    ##  [5] vegan_2.5-7       colorspace_1.4-1  DBI_1.1.0         mgcv_1.8-31      
+    ##  [9] permute_0.9-5     gridExtra_2.3     tidyselect_1.1.0  curl_4.3         
+    ## [13] compiler_4.0.2    cli_2.0.2         scales_1.1.1      stringr_1.4.0    
+    ## [17] digest_0.6.25     foreign_0.8-80    minqa_1.2.4       rmarkdown_2.3    
+    ## [21] rio_0.5.16        pkgconfig_2.0.3   htmltools_0.5.0   parallelly_1.28.1
+    ## [25] itertools_0.1-3   rlang_0.4.12      readxl_1.3.1      generics_0.0.2   
+    ## [29] zip_2.1.1         Rcpp_1.0.7        munsell_0.5.0     fansi_0.4.1      
+    ## [33] ape_5.4-1         abind_1.4-5       lifecycle_1.0.1   stringi_1.4.6    
+    ## [37] yaml_2.2.1        MASS_7.3-51.6     grid_4.0.2        blob_1.2.1       
+    ## [41] parallel_4.0.2    listenv_0.8.0     forcats_0.5.0     crayon_1.3.4     
+    ## [45] doSNOW_1.0.19     lattice_0.20-41   haven_2.3.1       splines_4.0.2    
+    ## [49] hms_0.5.3         knitr_1.29        rcdd_1.4          pillar_1.6.4     
+    ## [53] boot_1.3-25       codetools_0.2-16  fastmatch_1.1-0   magic_1.5-9      
+    ## [57] picante_1.8.2     glue_1.4.2        evaluate_0.14     data.table_1.13.0
+    ## [61] vctrs_0.3.8       nloptr_1.2.2.2    foreach_1.5.0     cellranger_1.1.0 
+    ## [65] gtable_0.3.0      assertthat_0.2.1  ggplot2_3.3.2     xfun_0.16        
+    ## [69] openxlsx_4.1.5    geometry_0.4.5    snow_0.4-4        iterators_1.0.12 
+    ## [73] cluster_2.1.0     globals_0.14.0    statmod_1.4.34    ellipsis_0.3.2
 
 # Acknowledgements
 
 Many thanks to the PREDICTS team, collaborators and data contributors.
-This work has been supported by the Natural Environment Research Council
+In particular, we are grateful to Andrés Baselga for help deciding on a
+sensible compositional similarity measure and to Luca Börger for his
+ongoing advice on statistical modelling. This work has been supported by
+the Natural History Museum, the Natural Environment Research Council
 (NE/M014533/1), the National Council of Science & Technology of Mexico
 (CONACyT) and the Prince Albert II of Monaco Foundation.
-
-# How to cite
-
-De Palma A., Sanchez-Ortiz K. & Purvis A. (2019) Calculating the
-Biodiversity Intactness Index: the PREDICTS implementation. doi:
-10.5281/zenodo.3518067

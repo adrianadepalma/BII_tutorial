@@ -1,6 +1,6 @@
 ---
 title: "Calculating the Biodiversity Intactness Index: the PREDICTS implementation"
-author: "Adriana De Palma, Katia Sanchez-Ortiz and Andy Purvis"
+author: "Adriana De Palma, Katia Sanchez-Ortiz, Helen R.P. Phillips and Andy Purvis"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
   html_document:
@@ -20,6 +20,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This tutorial gives a step-by-step guide on how to calculate the Biodiversity Intactness Index (BII) using the PREDICTS database. We'll go through where to find the PREDICTS data, how we go about analysing this data and finally how to project and calculate BII, using `R`. We'll be using just a subset of the data and a very simple model to start with. 
 
+You can explore the results from our most up-to-date global models on the Natural History Museum's [Biodiversity Trends Explorer](https://www.nhm.ac.uk/our-science/data/biodiversity-indicators/biodiversity-intactness-index-data?future-scenario=ssp2_rcp4p5_message_globiom&georegion=001&min-year=1970&max-year=2050&georegion-compare=null&show-uncertainty=true){target="_blank"}. This online tool allows users to explore historical and potential future trends in BII for different geographic units (e.g., countries, regions, global).
+
 
 # About PREDICTS
 
@@ -30,7 +32,7 @@ Because the database holds the original biodiversity data, statistical analysis 
 
 Because the surveys in the database arise from such very different methodologies, we fit mixed-effects models with survey-level random effects, allowing us to focus on how human pressures affect the response variable while acknowledging the among-survey heterogeneity. We assume that biotic differences among matched sites with different land uses are caused by the land-use difference, a form of space-for-time substitution. Some of our models also assume that the biota at sites with minimally-used primary vegetation (and minimal levels of other pressures) approximates their pristine biota. These assumptions would not be needed if representative long-term temporal data were available.
 
-Models can be fitted to the whole global data or to regions of particular interest (such as [tropical and subtropical forest biomes](https://www.biorxiv.org/content/10.1101/311688v3){target="_blank"}). The models can be combined with detailed spatiotemporal data on the pressures [to map the projected current state of the response variable](https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638){target="_blank"}, [estimate how it has changed in the past](https://www.biorxiv.org/content/10.1101/311688v3){target="_blank"}, or [project its future under alternative scenarios](https://www.biorxiv.org/content/10.1101/311787v1){target="_blank"}.
+Models can be fitted to the whole global data or to regions of particular interest (such as [tropical and subtropical forest biomes](https://www.nature.com/articles/s41598-021-98811-1){target="_blank"}). The models can be combined with detailed spatiotemporal data on the pressures [to map the projected current state of the response variable](https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638){target="_blank"}, [estimate how it has changed in the past](https://www.nature.com/articles/s41598-021-98811-1){target="_blank"}, or [project its future under alternative scenarios](https://www.biorxiv.org/content/10.1101/311787v1){target="_blank"}.
 </details>
 
 
@@ -41,14 +43,16 @@ BII became more prominent with its adoption in the [2015 revision of the Planeta
 
 In the absence of sufficient collated biodiversity data, BII was initially [estimated](https://www.nature.com/articles/nature03289){target="_blank"} using carefully-structured expert opinion. The PREDICTS team [first estimated BII based on primary biodiversity data in 2016](https://science.sciencemag.org/content/353/6296/288){target="_blank"}, by combining two statistical models -- one of site-level organismal abundance, and one of compositional similarity to a site still having primary vegetation. The latter model was needed to account for the fact that models of overall organismal abundance do not consider turnover in species composition. Although we gave several reasons why our estimates of BII were likely to be overoptimistic, our 2016 estimates nonetheless placed the world, nearly all biomes and nearly all biodiversity hotspots below the proposed 'safe limit' for BII.
 
-We have [continued to refine the modelling framework to improve our estimates of BII](https://www.biorxiv.org/content/10.1101/311688v3){target="_blank"}. The most important improvements since the 2016 paper have been:
+We have [continued to refine the modelling framework to improve our estimates of BII](https://www.nature.com/articles/s41598-021-98811-1){target="_blank"}. The most important improvements since the 2016 paper have been:
 
-* Use of a more stringent baseline in models of compositional similarity. Whereas the 2016 paper used all primary vegetation sites (even those with intense human use) as the baseline land use, growth of the database and a switch to a more efficient (matrix-based) model framework have allowed us to use only minimally-used primary vegetation as the baseline.
+* Use of a more stringent baseline in models of compositional similarity. Whereas the 2016 paper used all primary vegetation sites (even those with intense human use) as the baseline land use, growth of the database and a switch to a more efficient (matrix-based) model framework have allowed us to use a more suitable baseline. Depending on the analysis, this could include only minimally-used primary vegetation as the baseline, or it could include a mixture of minimally- and lightly-used primary vegetation as well as minimally-used mature secondary vegetation.
 * A more principled transformation of the compositional similarity estimates prior to modelling. Although the log-transformation used in the 2016 paper produced acceptable model diagnostics, it does not recognise the bounded nature of compositional similarity (which can range from 0 to 1). We now use a logit transformation instead, which provides more sensitive discrimination among land uses.
 
-The estimates of BII that result from the improved framework tend to be [markedly lower than those we obtained in 2016](https://www.nature.com/articles/s41559-019-0896-0){target="_blank"}. One issue that remains to be addressed is that the land-use rasters we have been using to make spatial projections do not differentiate planted from natural forest, meaning our estimates are still likely to be too high in regions with extensive planted forest. Work to address this shortcoming is underway.
+The estimates of BII that result from the improved framework tend to be [markedly lower than those we obtained in 2016](https://www.nature.com/articles/s41559-019-0896-0){target="_blank"}. One issue that remains to be addressed is that the land-use rasters we have been using to make spatial projections do not accurately differentiate planted from natural forest, meaning our estimates are still likely to be too high in regions with extensive planted forest. Work to address this shortcoming is underway.
 
-BII, being an indicator of the average state of local ecological communities, complements indicators based on species' global conservation status (such as the Red List Index), or on population trends (such as the Living Planet Index). These different facets of biodiversity are all important, and [can be combined to provide a roadmap towards restoring global biodiversity](https://www.nature.com/articles/s41893-018-0130-0){target="_blank"}.
+More recently, we have begun to use a more conservative measure of compositional similarity. Our analyses previously used the asymmetric Jaccard Index, which considers only species identity, but not structure; for example, shifts in dominance. To account for changes in both species identity and community structure due to human activities, we have now implemented the [balanced Bray-Curtis index](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.12693){target="_blank"}. You'll find more information about the differences between the indices below.
+
+BII, being an indicator of the average state of local ecological communities, complements indicators based on species' global conservation status (such as the Sampled Red List Index), or on population trends (such as the Living Planet Index). These different facets of biodiversity are all important, and [can be combined to provide a roadmap towards restoring global biodiversity](https://www.nature.com/articles/s41893-018-0130-0){target="_blank"}.
 </details>
 
 
@@ -57,19 +61,21 @@ BII, being an indicator of the average state of local ecological communities, co
 ```{r, message=FALSE, warning=FALSE}
 library(dplyr) # for easy data manipulation
 library(tidyr) # ditto
+library(tibble) # ditto
 library(magrittr) # for piping
 library(lme4) # for mixed effects models
 library(car) # for logit transformation with adjustment
+library(betapart) # for calculating balanced bray-curtis dissimilarity
 library(raster) # for working with raster data
 library(geosphere) # calculating geographic distance between sites
-library(foreach) # running loops
-library(doParallel) # running loops in parallel
-
+library(purrr) # running loops
+library(furrr) # running loops in parallel
+library(viridis) # figure colours for colour blindness
 ```
 
 # Prepare the biodiversity data
 
-You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a/>. If you're working in `R`, I would strongly suggest downloading `database.rds` (the database is very large, and the rds file is much quicker to load in than the csv file).
+You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a/>. If you're working in `R`, I would strongly suggest downloading `database.rds` (the database is very large, and the .rds file is much quicker to load in than the .csv file).
 
 Once you've downloaded the database, read it in. I'm going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for _any_ region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.
 
@@ -161,9 +167,30 @@ Note that here we are using the `Effort_corrected_measurement`. For some studies
 
 ## Compositional Similarity
 
-We use the _asymmetric Jaccard Index_ as our measure of compositional similarity. Essentially, we want to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site.
+Up until recently, we used the _asymmetric Jaccard Index_ as our measure of compositional similarity. Essentially, we wanted to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site. We're now using a more sensitive measure of compositional similarity -- _balanced Bray-Curtis_ -- that considers changes in community structure, rather than just identiy.
 
-As an example, let's look at the following simple scenario. Our primary minimal site had 15 _Species A_ individuals and 30 _Species B_ individuals. A cropland site has 10 _Species A_ and 40 _Species C_ individuals. The compositional similarity measure that we use currently would say that only 10 out of a total 50 individuals in the cropland site were from _originally present species_ (i.e. _Species A_): a value of 0.2.
+Let's take a look at a couple of examples to illustrate the differences between these two measures of compositional similarity.
+
+*Example 1:*
+
+|Site| Species A | Species B | Species C | Species D|
+|:---| :---: | :---: | :---: | :---: |
+|Site 1: Primary minimal | 35 | 15 | 0 | 0 |
+|Site 2: Cropland | 15 | 35 | 0 | 0 |
+
+Here we've got no new species and no changes in abundance, but the dominance structure has totally changed -- Species A is the most dominant in Site 1, but Species B is most dominant in Site 2. The _asymmetric Jaccard Index_ would say that these sites have a similarity of 1, because there are no novel species (100% of the individuals come from 'originally-present species'). Our new measure, however, would say that there is a similarity of 0.6, because there has been a change in community structure.
+
+*Example 2:*
+
+|Site| Species A | Species B | Species C | Species D|
+|:---| :---: | :---: | :---: | :---: |
+|Site 1: Primary minimal | 35 | 24 | 0 | 1 |
+|Site 2: Cropland | 10 | 0 | 45 | 5 |
+
+In this example, we've got some new species in the Cropland site, a shift in dominance (Species A is the most dominant in Primary minimal, but not in Cropland), but the same overall abundance in both sites.
+
+When we calculate the compositional similarity using our previous measure, we get a value of 0.25 (because 15 out of the 60 individuals in Site 2 were also present in Site 1), but with our new measure, we get a value of 0.18.
+
 
 Now, for every study with a `Primary minimal` site, we want to calculate this compositional similarity measure against every other site in the study. Note that this has to be done _within_ studies: it would be pointless to compare similarity between a site from a study of birds with a site from a study of bees.
 
@@ -208,103 +235,72 @@ cd_data_input <- diversity %>%
 ```
 
 
-Now we'll set up a function to calculate compositional similarity between a single pair of sites in a study.
+Now we'll set up a function to calculate compositional similarity between a single pair of sites in a study (See the previous version of this walkthrough for the function for calculating the asymmetrical Jaccard's similarity).
 
 ```{r}
-getJacAbSym <- function(s1, s2, data){
 
-  # get the list of species that are present in site 1 (i.e., their abundance was greater than 0)
-  s1species <- data %>%
-    
-    # filter out the SSBS that matches s1
-    filter(SSBS == s1) %>%
-    
-    # filter out the species where the Measurement (abundance) is greater than 0
-    filter(Measurement > 0) %>%
-    
-    # get the unique species from this dataset
-    distinct(Taxon_name_entered) %>%
-    
-    # pull out the column into a vector
-    pull
+get_bray <- function(s1, s2, data){
   
-  # for site 2, get the total abundance of species that are also present in site 1
+  require(betapart)
   
-  s2abundance_s1species <- data %>%
+  sp_data <- data %>%
     
-    # filter out the SSBS that matches s2
-    filter(SSBS == s2) %>%
+    # filter out the SSBS that matches the pair of sites we're interested in
+    filter(SSBS %in% c(s1, s2)) %>%
     
-    # filter out the species that are also present in site 1
-    filter(Taxon_name_entered %in% s1species) %>%
+    # pull out the site name, species name and abundance information
+    dplyr::select(SSBS, Taxon_name_entered, Measurement) %>%
     
-    # pull out the Measurement into a vector
-    pull(Measurement) %>%
+    # pivot so that each column is a species and each row is a site
+    pivot_wider(names_from = Taxon_name_entered, values_from = Measurement) %>%
     
-    # calculate the sum
-    sum()
+    # set the rownames to the SSBS and then remove that column
+    column_to_rownames("SSBS")
   
-  # calculate the total abundance of all species in site 2
-  s2_sum <- data %>%
-    
-    # filter out the SSBS that matches s2
-    filter(SSBS == s2) %>%
-    
-    # pull out the measurement column (the abundance)
-    pull(Measurement) %>%
-    
-    # calculate the sum
-    sum() 
-  
-  
-  # Now calculate the compositional similarity
-  # this is the number of individuals of species also found in s1, divided by the total abundance in s2 
-  # so that equates to the proportion of individuals in s2 that are of species also found in s1
-  
-  sor <- s2abundance_s1species / s2_sum
-
-  
-  # if there are no taxa in common, then sor = 0
-  # if abundances of all taxa are zero, then similarity becomes NaN.
-  return(sor)
-  
+  # if one of the sites doesn't have any individuals in it
+  # i.e. the row sum is 0
+  if(sum(rowSums(sp_data) == 0, na.rm = TRUE) == 1){
+    # then the similarity between sites should be 0
+    bray <- 0
+  # if both sites have no individuals
+  }else if(sum(rowSums(sp_data) == 0, na.rm = TRUE) == 2){
+    # then class the similarity as NA
+    bray <- NA
+  # otherwise if both sites have individuals, calculate the balanced bray-curtis
+  # as similarity (1-bray)
+  }else{
+    bray <- 1 - 
+      bray.part(sp_data) %>%
+      pluck("bray.bal") %>%
+      pluck(1)
   }
+  
+}
+
+
 ```
 
-Now that we've set up all the functions to gather the data for the compositional similarity models, let's get the dataset. We'll first get together a vector of all the study IDs that we need to perform the calculations for.
+
+Now that we've got the function to gather the data for the compositional similarity models, let's get the dataset. We'll first get together a vector of all the study IDs that we need to perform the calculations for.
 
 ```{r}
 # get a vector of each study to loop over
-studies <- distinct(cd_data_input, SS) %>%
+studies <- cd_data_input %>%
+  distinct(SS) %>%
   pull()
 ```
 
-Now we have to loop over each element in `studies` and calculate:
-
-1. the compositional similarity between each pair of sites
-2. the geographic distance between each pair of sites
-3. the land uses for each pair of sites
-
-I'm going to do this in parallel, as we're looping over a lot of studies.
-
-```{r calc_comp_sim, cache=TRUE}
-
-registerDoParallel(cores = 2)
-
-# If you're not familiar with loops (or with foreach loops):
-# I'm going to loop over every element (s) in studies and combine the results of each loop by rbinding them into one large dataset. Since we're using functions from different packages within this loop, we need to specify them (if you don't do the loop in parallel, this isn't necessary)
-cd_data <- foreach(s = studies, 
-                   .combine = rbind,
-                   .packages = c("dplyr", "magrittr", "geosphere")) %dopar% {
+Next, get all the site comparisons for each study. We're using the `purrr:map` function here which will loop over each study in turn and perform the custom function we've specified. Note that we're using `map_dfr` because at the end, I'd like a dataframe where each row gives the pair of sites that need comparing.
+```{r}
+site_comparisons <- map_dfr(.x = studies, .f = function(x){
   
   # filter out the given study
-  data_ss <- filter(cd_data_input, SS == s)
-  
-  # pull out the SSBS and LandUse information (we'll use this later to assign a land use contrast to each pair of site
-  site_data <- data_ss %>%
+  site_data <- filter(cd_data_input, SS == x) %>%
+    # pull out the SSBS and LandUse information
     dplyr::select(SSBS, LandUse) %>%
+    # simplify the data so we only have one row for each site
     distinct(SSBS, .keep_all = TRUE)
-  
+
   # pull out the sites that are Primary minimal (we only want to use comparisons with the baseline)
   baseline_sites <- site_data %>%
     filter(LandUse == "Primary minimal") %>%
@@ -314,7 +310,6 @@ cd_data <- foreach(s = studies,
   site_list <- site_data %>%
     pull(SSBS)
   
-
   # get all site x site comparisons for this study
   site_comparisons <- expand.grid(baseline_sites, site_list) %>%
     
@@ -322,41 +317,86 @@ cd_data <- foreach(s = studies,
     rename(s1 = Var1, s2 = Var2) %>%
     
     # remove the comparisons where the same site is being compared to itself
-    filter(s1 != s2)
+    filter(s1 != s2) %>%
     
+    # make the values characters rather than factors
+    mutate(s1 = as.character(s1),
+           s2 = as.character(s2),
+           
+           # add the full name
+           contrast = paste(s1, "vs", s2, sep = "_"),
+           
+           # add the study id
+           SS = as.character(x))
   
-  # apply the compositional similarity function over each site combination in the dataset
-  sor <- apply(site_comparisons, 1, function(y) getJacAbSym(data = data_ss, s1 = y['s1'], s2 = y['s2']))
-  
-  # calculate the geographic distance between sites
-  # first pull out the lat and longs for each site combination
-  s1LatLong <- as.matrix(data_ss[match(site_comparisons$s1, data_ss$SSBS), c('Longitude','Latitude')])
-  s2LatLong <- as.matrix(data_ss[match(site_comparisons$s2, data_ss$SSBS), c('Longitude','Latitude')])
+  return(site_comparisons)
+})
 
-  # then calculate the distance between sites
-  dist <- distHaversine(s1LatLong, s2LatLong)
-
-  # pull out the land-use contrast for those site combinations
-  Contrast <- paste(site_data$LandUse[match(site_comparisons$s1, site_data$SSBS)],
-                    site_data$LandUse[match(site_comparisons$s2, site_data$SSBS)], 
-                    sep = "-")
-  
-  # put all the information into a single dataframe
-  
-  study_results <- data.frame(site_comparisons,
-                              sor,
-                              dist,
-                              Contrast,
-                              SS = s,
-                              stringsAsFactors = TRUE)
-
-  
-  
-}
-
-# stop running things in parallel
-registerDoSEQ()
 ```
+
+For each study and set of comparisons, we need to calculate the compositional similarity. We're going to set this up to run in parallel. I'm using the `purrr::map` functions here (made to run in parallel using the `furrr` package), but there are other options, like `for` loops or `apply`.
+
+```{r, cache = TRUE}
+future::plan(multisession, workers = 4)
+
+# I'm using map2 (because there are two arguments I'm passing through - s1 and s2)
+# and the map2_dbl because the output I want is a vector of numbers (double rather than integer format)
+# so this function is going to go through each s1 and s2 in turn
+# and pass them into the get_bray function
+bray <- future_map2_dbl(.x = site_comparisons$s1,
+                        .y = site_comparisons$s2,
+                        ~get_bray(s1 = .x, s2 = .y, data = cd_data_input))
+
+# stop running things in parallel for now
+future::plan(sequential)
+```
+
+Next we'll pull out the additional data we need (which don't require a loop), including the geographic distance between sites and the land uses.
+```{r}
+# for the other required information, we don't need to run loops
+latlongs <- cd_data_input %>%
+  # for each site in the dataset
+  group_by(SSBS) %>%
+  # pull out the lat and long
+  summarise(Lat = unique(Latitude),
+            Long = unique(Longitude))
+
+lus <- cd_data_input %>%
+  # for each site in the dataset
+  group_by(SSBS) %>%
+  # pull out the land use
+  summarise(lu = unique(LandUse))
+
+```
+
+Let's put all the data together into a dataset we can use for modelling.
+```{r}
+# now let's put all the data together
+cd_data <- site_comparisons %>%
+  # add in the bray-curtis data
+  # which is already in the same order as site_comparisons
+  mutate(bray = bray) %>%
+  # get the lat and long for s1
+  left_join(latlongs, by = c("s1" = "SSBS")) %>%
+  rename(s1_lat = Lat,
+         s1_long = Long) %>%
+  # get the lat and long for s2
+  left_join(latlongs, by = c("s2" = "SSBS")) %>%
+  rename(s2_lat = Lat,
+         s2_long = Long) %>%
+  # calculate the geographic distances between s1 and s2 sites
+  mutate(geog_dist = distHaversine(cbind(s1_long, s1_lat), cbind(s2_long, s2_lat))) %>%
+  # get the land use for s1
+  left_join(lus, by = c("s1" = "SSBS")) %>%
+  rename(s1_lu = lu) %>%
+  # get the land use for s2
+  left_join(lus, by = c("s2" = "SSBS")) %>%
+  rename(s2_lu = lu) %>%
+  # create an lu_contrast column (what we'll use for modelling)
+  mutate(lu_contrast = paste(s1_lu, s2_lu, sep = "_vs_"))
+```
+
+
 
 # Run the statistical analysis
 
@@ -376,43 +416,36 @@ The model shows that all land uses except for secondary vegetation have lower to
 
 ## Compositional Similarity
 
-Now let's do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount _natural_ turnover in species with distance. You can also include environmental distance (we've done this previously based on Gower's dissimilarity of climatic variables) and additional human pressures in models like this.
+Now let's do a model of compositional similarity. For compositional similarity models, we include a measure of the geographic distance beween sites. This allows us to discount _natural_ turnover in species with distance. You can also include environmental distance (we've done this previously based on Gower's dissimilarity of climatic variables). You might also want to include additional pressure variables in the compositional similarity model, such as human population density and road density. We usually do this by including the pressure at site 2 (the non-baseline site) as well as the _difference_ in pressure between site 1 and site 2.
 
-The compositional similarity measure we use is bounded between 0 and 1 -- this means the errors will probably not be normally distributed. Although log-transformation produced models with acceptable diagnostics, it doesn't respect the boundedness of the compositional similarity measure. We've found that a logit transformation (with an adjustment to account for 0s and 1s), which does recognise the boundedness, also gives acceptable diagnostics.
+The compositional similarity measure we use is bounded between 0 and 1 -- this means the errors will probably not be normally distributed. Although log-transformation produced models with acceptable diagnostics, it doesn't respect the boundedness of the compositional similarity measure. We've found that a logit transformation (with an adjustment to account for 0s and 1s) also gives acceptable diagnostics and is conceptually more appropriate as it does recognise the boundedness of the data.
 
 ```{r}
 # there is some data manipulation we want to do before modelling
 cd_data <- cd_data %>%
   
-  # Firstly, we only care about comparisons where Primary minimal is the first site
-  # so pull the contrast apart
-  separate(Contrast, c("s1_LandUse", "s2_LandUse"), sep = "-", remove = FALSE) %>%
-  
-  # filter sites where s1_LandUse is the baseline site
-  filter(s1_LandUse == "Primary minimal") %>%
-  
   # logit transform the compositional similarity
-  mutate(logitCS = logit(sor, adjust = 0.001, percents = FALSE)) %>%
+  mutate(logitCS = logit(bray, adjust = 0.001, percents = FALSE)) %>%
   
   # log10 transform the geographic distance between sites
-  mutate(log10geo = log10(dist + 1)) %>%
+  mutate(log10geo = log10(geog_dist + 1)) %>%
   
   # make primary minimal-primary minimal the baseline again
-  mutate(Contrast = factor(Contrast), 
-         Contrast = relevel(Contrast, ref = "Primary minimal-Primary minimal"))
+  mutate(lu_contrast = factor(lu_contrast), 
+         lu_contrast = relevel(lu_contrast, ref = "Primary minimal_vs_Primary minimal"))
 
 
 # Model compositional similarity as a function of the land-use contrast and the geographic distance between sites
-cd_m <- lmer(logitCS ~ Contrast + log10geo + (1|SS), data = cd_data)
+cd_m <- lmer(logitCS ~ lu_contrast + log10geo + (1|SS) + (1|s2), data = cd_data)
 summary(cd_m)
 ```
 
-Note that you can't trust the significance values of these compositional similarity values. The same site goes into multiple comparisons in the model (each Primary minimal site is compared to all other sites in the study), which will inflate the p-values. If you want to look at significance values, you'll need to use permutation tests in order to see which effects are significant. We're not going to do that here because they can take a while.
+Note that you can't trust the significance values of these compositional similarity values. The same site goes into multiple comparisons in the model (each Primary minimal site is compared to all other sites in the study), which will inflate the p-values. We've added in a random intercept for site 2 (`s2`) to try to account for this, but really if you want to look at significance values, you'll need to use permutation tests in order to see which effects are significant. We're not going to do that here because they can take a while.
 
 
 # Projecting the model
 
-Now we have one model (`ab_m`) telling us how land-use change influences the total abundance of species and one model (`cs_m`) that tells us what proportion of those individuals are from 'originally present species' in a community. Multiplying these together gives us the BII: the abundance of originally present species. We do this by projecting abundance and compositional similarity onto rasters of pressure data, and then multiplying the two output maps together.
+Now we have one model (`ab_m`) telling us how land-use change influences the total abundance of species and one model (`cs_m`) that tells how similar the community structure is. Multiplying these together gives us the BII: the intactness of nature in the system. We do this by projecting abundance and compositional similarity onto rasters of pressure data, and then multiplying the two output maps together. You can use python to project predicts-style models ([See here for the code](https://github.com/ricardog/raster-project){target="_blank"}), but let's do it using R so you can see step-by-step exactly what's happening. 
 
 
 ## Model predictions
@@ -443,8 +476,8 @@ inv_logit <- function(f, a){
 
 # once again, set up the dataframe with all the levels you want to predict diversity for
 # because we had an extra fixed effect in this model (log10geo), we also have to set a baseline level for this
-# we'll set it to 0 because we're interested in the compositional similarity when distance between sites is 0 (i.e., when distance-based turnover is discounted, what is the turnover because of land use?)
-newdata_cd <- data.frame(Contrast = levels(cd_data$Contrast),
+# We're interested in the compositional similarity when we discount natural turnover, so we want to set this to a static value. We'll use 0 here, but we can also set it to the median geographic distance in the original data or any other meaningful level.
+newdata_cd <- data.frame(lu_contrast = levels(cd_data$lu_contrast),
                       log10geo = 0) %>%
   mutate(cd_m_preds = predict(cd_m, ., re.form = NA) %>%
            inv_logit(a = 0.001))
@@ -453,7 +486,7 @@ newdata_cd <- data.frame(Contrast = levels(cd_data$Contrast),
 It's these _predicted_ values (`ab_m_preds` and `cd_m_preds`) that we're going to use. We will multiply the predicted abundance and compositional similarity in each land-use class with the area of the cell in that land-use class. However, because we have a mixed effects model, the _absolute_ values are somewhat meaningless. Instead, we care about the _relative_ values -- what is the abundance or compositional similarity _relative_ to what we'd find if the whole landscape was still minimally-used primary vegetation. So once we have the predictions, we divide by the reference value (the predicted abundance or compositional similarity if the whole cell was minimally-used primary vegetation).
 
 ## Gather land-use rasters
-You can use any land-use data you like, but many land-use maps don't have classes that map easily onto the definitions used by PREDICTS. Notable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>), because PREDICTS land-use classes were designed with these maps in mind, and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
+You can use any land-use data you like, but many land-use maps don't have classes that map easily onto the definitions used by PREDICTS. Notable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>) -- because PREDICTS land-use classes were designed with these maps in mind -- and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
 
 I'm just going to simulate some rasters here for ease.
 
@@ -509,7 +542,7 @@ for(i in 1:ncol(lus)){
 For example, here's the raster showing the amount of urban land in each cell:
 ```{r}
 
-plot(urb_raster)
+plot(urb_raster, col = viridis(20))
 
 ```
 
@@ -531,23 +564,24 @@ ab_raster <- (newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary minimal'] * p
   newdata_ab$ab_m_preds[newdata_ab$LandUse == 'Primary minimal']
 
 
-cd_raster <- (newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary minimal'] * pri_min_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary vegetation'] * pri_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Plantation forest'] * plant_raster + 
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Secondary vegetation'] * sec_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Cropland'] * crop_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Pasture'] * pas_raster +
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Urban'] * urb_raster) /
+cd_raster <- (newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Primary minimal'] * pri_min_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Primary vegetation'] * pri_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Plantation forest'] * plant_raster + 
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Secondary vegetation'] * sec_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Cropland'] * crop_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Pasture'] * pas_raster +
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Urban'] * urb_raster) /
   
   # divide by the reference value
-  newdata_cd$cd_m_preds[newdata_cd$Contrast == 'Primary minimal-Primary minimal']
+  newdata_cd$cd_m_preds[newdata_cd$lu_contrast == 'Primary minimal_vs_Primary minimal']
 ```
 
 The final step is to multiply the abundance and compositional similarity rasters together. We'll also multiply the values by 100 so that BII is expressed as a percentage rather than a proportion.
 
 ```{r}
 bii <- ab_raster * cd_raster
-plot(bii * 100)
+plot(bii * 100, col = viridis(20))
+
 ```
 
 
@@ -569,7 +603,7 @@ Four approaches have been used to validate PREDICTS' models and estimates of BII
 3. We have tested whether model parameters differ significantly among regions or taxonomic groups by testing for region $\times$ pressure or group $\times$ pressure interactions, e.g., [this paper](https://www.nature.com/articles/srep31153){target="_blank"} and [this paper](https://link.springer.com/article/10.1007/s10531-017-1356-2){target="_blank"}.
 4. [One paper](https://zslpublications.onlinelibrary.wiley.com/doi/full/10.1111/acv.12327){target="_blank"} collected field data on birds at sites in Tanzania and Kenya, and compared an Africa-wide PREDICTS biodiversity model with a bird model based on the independent field data.
 
-A key assumption of our method for calculating BII is that species in minimally-used primary vegetation are _native_ species. This is not always true, but we can't always identify which species are native or alien in the PREDICTS database. For island communities where we can distinguish native species from alien species, we are working to compare BII as calculated above (with an abundance model and compositional similarity model) with BII modeled as the abundance of native species only (with an abundance model of _only_ native species). 
+A key assumption of our method for calculating BII is that species in minimally-used primary vegetation are _native_ species. This is not always true, but we can't always identify which species are native or alien in the PREDICTS database. For island communities where we can distinguish native species from alien species, we are working to compare BII as calculated above (with an abundance model and compositional similarity model) with BII modeled as the abundance of native species only (with an abundance model of _only_ native species)([See here](https://www.biorxiv.org/content/10.1101/2019.12.16.878041v1){target="_blank"} for some of the results of this work). 
 
 # Advantages
 
@@ -587,20 +621,19 @@ Secondly, the models presented in this walkthrough assume that the biota at site
 ## Uncertainty
 Hopefully it goes without saying, but the uncertainty in the BII map will depend on its inputs, both in terms of the statistical models and the geospatial data used for projections. The higher the uncertainty in these aspects, the higher the uncertainty in the BII projections. Although land-use mapping is continually advancing, there are still limitations. So using a global map and then drilling down into a single pixel is not really advisable. Instead, the maps are more likely to be reliable when looking over broader areas and larger time steps, rather than pixel by pixel and year by year.
 
+Note that on the Natural History Museum's [Biodiversity Trends Explorer](https://www.nhm.ac.uk/our-science/data/biodiversity-indicators/biodiversity-intactness-index-data?future-scenario=ssp2_rcp4p5_message_globiom&georegion=001&min-year=1970&max-year=2050&georegion-compare=null&show-uncertainty=true){target="_blank"}, we've used cross-validation to produce upper and lower uncertainty bounds on the projections. We have refit the models leaving one biome out in turn, and then projected BII from these models; the highest and lowest projections in the set provide some uncertainty bounds. It is important to note, however, that these bounds only include some of the many sources uncertainty (mainly stemming from geographic bias in the underlying dataset and uncertainty in model fitting), so more work still needs to be done to effectively calculate and communicate uncertainty in our projections.
+
 ## BII is a valuable metric, but isn't the only answer
 BII is a measure of ecosystem intactness, but we do not expect it to be used in isolation. There are myriad biodiversity metrics and indices out there, and which one you use will depend on what is most important/interesting/relevant to you and your system. [BII is just one metric, but can complement others](https://www.nature.com/articles/s41893-018-0130-0){target="_blank"}, such as indicators based on extinction risk and population decline.
 
 
 # R Info
 ```{r}
-
 utils::sessionInfo()
 ```
 
 
 # Acknowledgements
-Many thanks to the PREDICTS team, collaborators and data contributors. This work has been supported by the Natural Environment Research Council (NE/M014533/1), the National Council of Science & Technology of Mexico (CONACyT) and the Prince Albert II of Monaco Foundation.
+Many thanks to the PREDICTS team, collaborators and data contributors. In particular, we are grateful to Andrés Baselga for help deciding on a sensible compositional similarity measure and to Luca Börger for his ongoing advice on statistical modelling. This work has been supported by the Natural History Museum, the Natural Environment Research Council (NE/M014533/1), the National Council of Science & Technology of Mexico (CONACyT) and the Prince Albert II of Monaco Foundation.
 
-# How to cite
-De Palma A., Sanchez-Ortiz K. & Purvis A. (2019) Calculating the Biodiversity Intactness Index: the PREDICTS implementation. doi: 10.5281/zenodo.3518067
 
