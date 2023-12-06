@@ -8,5 +8,5 @@ This is the second version of the walkthrough. The main update has been to use a
 
 This repository is licensed under [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
 
-© The Trustees of the Natural History Museum, London 2021. Some Rights Reserved.
+© The Trustees of the Natural History Museum, London 2019. Some Rights Reserved.
 
