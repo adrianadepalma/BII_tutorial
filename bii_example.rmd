@@ -14,8 +14,12 @@ output:
     toc_depth: 4
     html_preview: FALSE
 knit: (function(inputFile, encoding) {
-  rmarkdown::render(inputFile, encoding = encoding,
-  output_format = "all") })
+  rmarkdown::render(
+    inputFile, 
+    encoding = encoding,
+    output_format = "all",
+    output_file = "index"
+    ) })
 ---
 
 ```{r setup, include=FALSE}
