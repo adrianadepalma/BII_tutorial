@@ -4,6 +4,8 @@ The document gives an example of how to model and project the Biodiversity Intac
 
 This is the second version of the walkthrough. The main update has been to use a more sensitive measure of compositional similarity, which accounts for changes in community structure rather than just species identity.
 
+This document is hosted here: https://adrianadepalma.github.io/BII_tutorial/bii_example.html
+
 [![DOI](https://zenodo.org/badge/169256761.svg)](https://zenodo.org/badge/latestdoi/169256761)
 
 This repository is licensed under [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
