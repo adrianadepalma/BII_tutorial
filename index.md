@@ -1067,7 +1067,7 @@ cell:
 terra::plot(urb_raster, col = viridis::viridis(20))
 ```
 
-![](bii_example_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](index_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ## Spatial projections of BII
 
@@ -1110,10 +1110,10 @@ bii <- ab_raster * cd_raster
 terra::plot(bii * 100, col = viridis::viridis(20))
 ```
 
-![](bii_example_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](index_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 Once you have your map of BII, you can calculate the average value
-across any spatial scale. The average BII across this map is 60.26.
+across any spatial scale. The average BII across this map is 60.39.
 
 And that is it. A quick walkthrough of how we use the PREDICTS database
 to model and project the Biodiversity Intactness Index.
