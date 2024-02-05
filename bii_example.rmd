@@ -12,6 +12,10 @@ output:
   github_document:
     toc: yes
     toc_depth: 4
+    html_preview: FALSE
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding,
+  output_format = "all") })
 ---
 
 ```{r setup, include=FALSE}
@@ -25,7 +29,7 @@ You can explore the results from our most up-to-date global models on the Natura
 
 # About PREDICTS
 
-<details><summary>[PREDICTS](https://www.predicts.org.uk/){target="_blank"} -- Projecting Responses of Ecological Diversity In Changing Terrestrial Systems -- is a collaboration that aims to model how local terrestrial biodiversity worldwide responds to land use and related pressures, and to use such models to project how biodiversity may change under future socioeconomic scenarios. *Expand to learn more*
+<details><summary>[PREDICTS](https://www.nhm.ac.uk/our-science/research/projects/predicts.html){target="_blank"} -- Projecting Responses of Ecological Diversity In Changing Terrestrial Systems -- is a collaboration that aims to model how local terrestrial biodiversity worldwide responds to land use and related pressures, and to use such models to project how biodiversity may change under future socioeconomic scenarios. *Expand to learn more*
 </summary>The PREDICTS team have collated a large database of biodiversity data from over 29,000 sites worldwide. These data have been provided by authors of over 700 separate surveys, each of which sampled biodiversity at multiple sites facing different land-use and related pressures. Although the different surveys have used a very wide range of different techniques, and focused on a wide array of different plant, fungal, invertebrate or vertebrate taxa (the database now holds data from over 50,000 species), the data from different sites within a survey are comparable, having been collected in the same way. Each site's land use and land-use intensity has been classified into a consistent set of categories, based on information in the paper or from the authors, and some other human pressures (e.g., human population density) are estimated for each site from global rasters. Details of how the database was put together -- including definitions of our land-use and use-intensity classes -- can be found in [this paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303){target="_blank"}; the first released version of the database is available from the [Natural History Museum's data portal](https://data.nhm.ac.uk/){target="_blank"}, and is described in [this paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.2579){target="_blank"}.
 
 Because the database holds the original biodiversity data, statistical analysis can model a wide range of response variables (as explained in [this paper](https://www.sciencedirect.com/science/article/pii/S0065250417300284){target="_blank"}), including site-level measures of diversity (such as [within-sample species richness, rarefaction-based richness or overall organismal abundance](https://www.nature.com/articles/nature14324){target="_blank"}), [among-site differences in community composition](https://onlinelibrary.wiley.com/doi/full/10.1111/ecog.01932){target="_blank"}, or [the occurrence and/or population size of each species](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2664.12524){target="_blank"}. Combining our data with other species-level information permits modelling of [functional and phylogenetic diversity](https://onlinelibrary.wiley.com/doi/10.1111/ddi.12638){target="_blank"} or of [a community-weighted measure of geographic range size](https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.2006841){target="_blank"}. This walkthrough document focuses on modelling two response variables: total site-level abundance, and compositional similarity between sites.
@@ -62,11 +66,10 @@ BII, being an indicator of the average state of local ecological communities, co
 library(dplyr) # for easy data manipulation
 library(tidyr) # ditto
 library(tibble) # ditto
-library(magrittr) # for piping
 library(lme4) # for mixed effects models
 library(car) # for logit transformation with adjustment
 library(betapart) # for calculating balanced bray-curtis dissimilarity
-library(raster) # for working with raster data
+library(terra) # for working with raster data
 library(geosphere) # calculating geographic distance between sites
 library(purrr) # running loops
 library(furrr) # running loops in parallel
@@ -75,18 +78,18 @@ library(viridis) # figure colours for colour blindness
 
 # Prepare the biodiversity data
 
-You can download the PREDICTS data from the <a href="http://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database" target="_blank">Natural History Museum data portal<a/>. If you're working in `R`, I would strongly suggest downloading `database.rds` (the database is very large, and the .rds file is much quicker to load in than the .csv file).
+You can download the PREDICTS data from the <a href="https://data.nhm.ac.uk/dataset/the-2016-release-of-the-predicts-database-v1-1" target="_blank">Natural History Museum data portal<a/>. If you're working in `R`, the database in `.rds` format will be much quicker to load in than the `.csv` file.
 
-Once you've downloaded the database, read it in. I'm going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for _any_ region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.
+Once you've downloaded the database, read it in. We are going to filter the data for just the Americas, to make the data manipulation and modelling a bit quicker. You can calculate BII for _any_ region of the world for which there are data, although we tend to do our BII modelling on a global scale or at least across multiple biomes.
 
 ```{r}
 # read in the data
-diversity <- readRDS("database.rds") %>%
+diversity <- readRDS("database.rds") |>
   
   # now let's filter out just the data for the Americas
-  filter(UN_region == "Americas")
+  dplyr::filter(UN_region == "Americas")
 
-glimpse(diversity)
+dplyr::glimpse(diversity)
 ```
 
 [This paper](https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.1303){target="_blank"} describes the PREDICTS database structure and content. Briefly, the database consists of a number of different sources (journal articles), `Source_ID` in the database, within which there can be multiple studies (`Study_name` and `Study_number`). Within each study, there are multiple sites (`Site_name` and `Site_number`) within blocks (`Block`). For ease, we use the combined, shorthand values for these: `SS` (`Study_number` and `Source_ID`), `SSB` (`SS` and `Block`) and `SSBS` (`SSB` and`Site_number`).
@@ -98,12 +101,12 @@ table(diversity$Predominant_land_use, diversity$Use_intensity)
 
 There's lots of data for the Americas across all land-use and intensity classes. Since we're using a simplified model for illustration purposes, we're not going to look at _all_ the use intensities here. However, we will keep _minimally-used primary vegetation_ separate, as this is the closest we have to a _pristine_ baseline.
 
-So let's collapse down the data. Note that I'm doing this purely to make the example simpler. In reality, we include multiple land use and intensity combinations, including the age class of secondary vegetation when possible.
+So let's collapse down the data. Note that we're doing this purely to make the example simpler. In reality, we include multiple land use and intensity combinations, including the age class of secondary vegetation when possible.
 
 ```{r}
-diversity <- diversity %>%
+diversity <- diversity |>
   # make a level of Primary minimal. Everything else gets the coarse land use
-  mutate(
+  dplyr::mutate(
     LandUse = ifelse(Predominant_land_use == "Primary vegetation" & Use_intensity == "Minimal use",
                      "Primary minimal",
                      paste(Predominant_land_use)),
@@ -133,41 +136,41 @@ The Biodiversity Intactness Index is derived from combining two models: one of t
 Total abundance is simply the sum of all individuals sampled at each site.
 
 ```{r}
-abundance_data <- diversity %>%
+abundance_data <- diversity |>
   
   # pull out just the abundance measures
-  filter(Diversity_metric_type == "Abundance") %>%
+  dplyr::filter(Diversity_metric_type == "Abundance") |>
   
   # group by SSBS (each unique value corresponds to a unique site)
-  group_by(SSBS) %>%
+  dplyr::group_by(SSBS) |>
   
   # now add up all the abundance measurements within each site
-  mutate(TotalAbundance = sum(Effort_corrected_measurement)) %>%
+  dplyr::mutate(TotalAbundance = sum(Effort_corrected_measurement)) |>
   
   # ungroup
-  ungroup() %>%
+  dplyr::ungroup() |>
   
   # pull out unique sites
-  distinct(SSBS, .keep_all = TRUE) %>%
+  dplyr::distinct(SSBS, .keep_all = TRUE) |>
   
   # now group by Study ID
-  group_by(SS) %>%
+  dplyr::group_by(SS) |>
   
   # pull out the maximum abundance for each study
-  mutate(MaxAbundance = max(TotalAbundance)) %>%
+  dplyr::mutate(MaxAbundance = max(TotalAbundance)) |>
   
   # ungroup
-  ungroup() %>%
+  dplyr::ungroup() |>
   
   # now rescale total abundance, so that within each study, abundance varies from 0 to 1.
-  mutate(RescaledAbundance = TotalAbundance/MaxAbundance)
+  dplyr::mutate(RescaledAbundance = TotalAbundance/MaxAbundance)
 ```
 
 Note that here we are using the `Effort_corrected_measurement`. For some studies, the sampling effort (but not the method) can vary slightly among sites. To account for this, we assume that abundance increases linearly with sampling effort (validated [here](https://www.nature.com/articles/srep31153){target="_blank"}) -- i.e., the abundance measurement is divided by the sampling effort so that it is transformed to abundance per unit effort. This is ok for modelling total abundance, but we can't account for how the _identity_ or _number_ of species varies with sampling effort in the same simple way. So in the next stage where species identity matters, you'll see that we're using the `Measurement` field (raw reported abundance), and will only use studies where the sampling effort does not vary among sites.
 
 ## Compositional Similarity
 
-Up until recently, we used the _asymmetric Jaccard Index_ as our measure of compositional similarity. Essentially, we wanted to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site. We're now using a more sensitive measure of compositional similarity -- _balanced Bray-Curtis_ -- that considers changes in community structure, rather than just identiy.
+Up until recently, we used the _asymmetric Jaccard Index_ as our measure of compositional similarity. Essentially, we wanted to know what species are present in our baseline sites (`Primary minimal`), and then for our converted sites (all other land uses), what proportion of individuals come from species that are also found in the baseline site. We're now using a more sensitive measure of compositional similarity -- _balanced Bray-Curtis_ -- that considers changes in community structure, rather than just identity.
 
 Let's take a look at a couple of examples to illustrate the differences between these two measures of compositional similarity.
 
@@ -197,38 +200,38 @@ Now, for every study with a `Primary minimal` site, we want to calculate this co
 Let's first set up the data we're going to use for the compositional similarity models.
 
 ```{r}
-cd_data_input <- diversity %>%
+cd_data_input <- diversity |>
   
   # drop any rows with unknown LandUse
-  filter(!is.na(LandUse)) %>%
+  dplyr::filter(!is.na(LandUse)) |>
   
   # pull out only the abundance data
-  filter(Diversity_metric_type == "Abundance") %>%
+  dplyr::filter(Diversity_metric_type == "Abundance") |>
   
   # group by Study
-  group_by(SS) %>%
+  dplyr::group_by(SS) |>
   
   # calculate the number of unique sampling efforts within that study
-  mutate(n_sample_effort = n_distinct(Sampling_effort)) %>%
+  dplyr::mutate(n_sample_effort = dplyr::n_distinct(Sampling_effort)) |>
   
   # calculate the number of unique species sampled in that study
-  mutate(n_species = n_distinct(Taxon_name_entered)) %>%
+  dplyr::mutate(n_species = dplyr::n_distinct(Taxon_name_entered)) |>
   
   # check if there are any Primary minimal sites in the dataset
-  mutate(n_primin_records = sum(LandUse == "Primary minimal")) %>%
+  dplyr::mutate(n_primin_records = sum(LandUse == "Primary minimal")) |>
   
   # ungroup
-  ungroup() %>%
+  dplyr::ungroup() |>
   
   # now keep only the studies with one unique sampling effort
-  filter(n_sample_effort == 1) %>%
+  dplyr::filter(n_sample_effort == 1) |>
   
   # and keep only studies with more than one species 
   # as these studies clearly aren't looking at assemblage-level diversity
-  filter(n_species > 1) %>%
+  dplyr::filter(n_species > 1) |>
   
   # and keep only studies with at least some Primary minimal data
-  filter(n_primin_records > 0) %>%
+  dplyr::filter(n_primin_records > 0) |>
   
   # drop empty factor levels
   droplevels()
@@ -241,21 +244,19 @@ Now we'll set up a function to calculate compositional similarity between a sing
 
 get_bray <- function(s1, s2, data){
   
-  require(betapart)
-  
-  sp_data <- data %>%
+  sp_data <- data |>
     
     # filter out the SSBS that matches the pair of sites we're interested in
-    filter(SSBS %in% c(s1, s2)) %>%
+    dplyr::filter(SSBS %in% c(s1, s2)) |>
     
     # pull out the site name, species name and abundance information
-    dplyr::select(SSBS, Taxon_name_entered, Measurement) %>%
+    dplyr::select(SSBS, Taxon_name_entered, Measurement) |>
     
     # pivot so that each column is a species and each row is a site
-    pivot_wider(names_from = Taxon_name_entered, values_from = Measurement) %>%
+    tidyr::pivot_wider(names_from = Taxon_name_entered, values_from = Measurement) |>
     
     # set the rownames to the SSBS and then remove that column
-    column_to_rownames("SSBS")
+    tibble::column_to_rownames("SSBS")
   
   # if one of the sites doesn't have any individuals in it
   # i.e. the row sum is 0
@@ -270,9 +271,9 @@ get_bray <- function(s1, s2, data){
   # as similarity (1-bray)
   }else{
     bray <- 1 - 
-      bray.part(sp_data) %>%
-      pluck("bray.bal") %>%
-      pluck(1)
+      betapart::bray.part(sp_data) |>
+      purrr::pluck("bray.bal") |>
+      purrr::pluck(1)
   }
   
 }
@@ -285,115 +286,127 @@ Now that we've got the function to gather the data for the compositional similar
 
 ```{r}
 # get a vector of each study to loop over
-studies <- cd_data_input %>%
-  distinct(SS) %>%
-  pull()
+studies <- cd_data_input |>
+  dplyr::distinct(SS) |>
+  dplyr::pull()
 ```
 
 Next, get all the site comparisons for each study. We're using the `purrr:map` function here which will loop over each study in turn and perform the custom function we've specified. Note that we're using `map_dfr` because at the end, I'd like a dataframe where each row gives the pair of sites that need comparing.
 ```{r}
-site_comparisons <- map_dfr(.x = studies, .f = function(x){
-  
-  # filter out the given study
-  site_data <- filter(cd_data_input, SS == x) %>%
-    # pull out the SSBS and LandUse information
-    dplyr::select(SSBS, LandUse) %>%
-    # simplify the data so we only have one row for each site
-    distinct(SSBS, .keep_all = TRUE)
-
-  # pull out the sites that are Primary minimal (we only want to use comparisons with the baseline)
-  baseline_sites <- site_data %>%
-    filter(LandUse == "Primary minimal") %>%
-    pull(SSBS)
-  
-  # pull out all the sites
-  site_list <- site_data %>%
-    pull(SSBS)
-  
-  # get all site x site comparisons for this study
-  site_comparisons <- expand.grid(baseline_sites, site_list) %>%
+site_comparisons <- purrr::map_dfr(
+  .x = studies, 
+  .f = function(x){
     
-    # rename the columns so they will be what the compositional similarity function expects for ease
-    rename(s1 = Var1, s2 = Var2) %>%
+    # filter out the given study
+    site_data <- dplyr::filter(cd_data_input, SS == x) |>
+      # pull out the SSBS and LandUse information
+      dplyr::select(SSBS, LandUse) |>
+      # simplify the data so we only have one row for each site
+      dplyr::distinct(SSBS, .keep_all = TRUE)
     
-    # remove the comparisons where the same site is being compared to itself
-    filter(s1 != s2) %>%
+    # pull out the sites that are Primary minimal (we only want to use comparisons with the baseline)
+    baseline_sites <- site_data |>
+      dplyr::filter(LandUse == "Primary minimal") |>
+      dplyr::pull(SSBS)
     
-    # make the values characters rather than factors
-    mutate(s1 = as.character(s1),
-           s2 = as.character(s2),
-           
-           # add the full name
-           contrast = paste(s1, "vs", s2, sep = "_"),
-           
-           # add the study id
-           SS = as.character(x))
-  
-  return(site_comparisons)
-})
+    # pull out all the sites
+    site_list <- site_data |>
+      dplyr::pull(SSBS)
+    
+    # get all site x site comparisons for this study
+    site_comparisons <- expand.grid(baseline_sites, site_list) |>
+      
+      # rename the columns so they will be what the compositional similarity function expects for ease
+      dplyr::rename(s1 = Var1, s2 = Var2) |>
+      
+      # remove the comparisons where the same site is being compared to itself
+      dplyr::filter(s1 != s2) |>
+      
+      # make the values characters rather than factors
+      dplyr:: mutate(
+        s1 = as.character(s1),
+        s2 = as.character(s2),
+        
+        # add the full name
+        contrast = paste(s1, "vs", s2, sep = "_"),
+        
+        # add the study id
+        SS = as.character(x)
+      )
+    
+    return(site_comparisons)
+  }
+)
 
 ```
 
-For each study and set of comparisons, we need to calculate the compositional similarity. We're going to set this up to run in parallel. I'm using the `purrr::map` functions here (made to run in parallel using the `furrr` package), but there are other options, like `for` loops or `apply`.
+For each study and set of comparisons, we need to calculate the compositional similarity. We're going to set this up to run in parallel. The following code uses the `purrr::map` functions (made to run in parallel using the `{furrr}` package), but there are other options, like `for` loops or `apply`.
 
 ```{r, cache = TRUE}
-future::plan(multisession, workers = 4)
+future::plan("multisession", workers = parallel::detectCores()-1)
 
-# I'm using map2 (because there are two arguments I'm passing through - s1 and s2)
-# and the map2_dbl because the output I want is a vector of numbers (double rather than integer format)
+# We're using map2 (because there are two arguments we're passing through - s1 and s2)
+# and the map2_dbl because the output we want is a vector of numbers (double rather than integer format)
 # so this function is going to go through each s1 and s2 in turn
 # and pass them into the get_bray function
-bray <- future_map2_dbl(.x = site_comparisons$s1,
-                        .y = site_comparisons$s2,
-                        ~get_bray(s1 = .x, s2 = .y, data = cd_data_input))
+bray <- furrr::future_map2_dbl(
+  .x = site_comparisons$s1,
+  .y = site_comparisons$s2,
+  ~get_bray(s1 = .x, s2 = .y, data = cd_data_input),
+  .options = furrr::furrr_options(seed = TRUE)
+)
 
 # stop running things in parallel for now
-future::plan(sequential)
+future::plan("sequential")
 ```
 
 Next we'll pull out the additional data we need (which don't require a loop), including the geographic distance between sites and the land uses.
 ```{r}
 # for the other required information, we don't need to run loops
-latlongs <- cd_data_input %>%
+latlongs <- cd_data_input |>
   # for each site in the dataset
-  group_by(SSBS) %>%
+  dplyr::group_by(SSBS) |>
   # pull out the lat and long
-  summarise(Lat = unique(Latitude),
-            Long = unique(Longitude))
+  dplyr::summarise(
+    Lat = unique(Latitude),
+    Long = unique(Longitude)
+  )
 
-lus <- cd_data_input %>%
+lus <- cd_data_input |>
   # for each site in the dataset
-  group_by(SSBS) %>%
+  dplyr::group_by(SSBS) |>
   # pull out the land use
-  summarise(lu = unique(LandUse))
+  dplyr::summarise(lu = unique(LandUse))
 
 ```
 
 Let's put all the data together into a dataset we can use for modelling.
 ```{r}
 # now let's put all the data together
-cd_data <- site_comparisons %>%
+cd_data <- site_comparisons |>
   # add in the bray-curtis data
   # which is already in the same order as site_comparisons
-  mutate(bray = bray) %>%
+  dplyr::mutate(bray = bray) |>
   # get the lat and long for s1
-  left_join(latlongs, by = c("s1" = "SSBS")) %>%
-  rename(s1_lat = Lat,
-         s1_long = Long) %>%
+  dplyr::left_join(latlongs, by = c("s1" = "SSBS")) |>
+  dplyr::rename(s1_lat = Lat, s1_long = Long) |>
   # get the lat and long for s2
-  left_join(latlongs, by = c("s2" = "SSBS")) %>%
-  rename(s2_lat = Lat,
-         s2_long = Long) %>%
+  dplyr::left_join(latlongs, by = c("s2" = "SSBS")) |>
+  dplyr::rename(s2_lat = Lat, s2_long = Long) |>
   # calculate the geographic distances between s1 and s2 sites
-  mutate(geog_dist = distHaversine(cbind(s1_long, s1_lat), cbind(s2_long, s2_lat))) %>%
+  dplyr::mutate(
+    geog_dist = geosphere::distHaversine(
+      cbind(s1_long, s1_lat), cbind(s2_long, s2_lat)
+    )
+  ) |>
   # get the land use for s1
-  left_join(lus, by = c("s1" = "SSBS")) %>%
-  rename(s1_lu = lu) %>%
+  dplyr::left_join(lus, by = c("s1" = "SSBS")) |>
+  dplyr::rename(s1_lu = lu) |>
   # get the land use for s2
-  left_join(lus, by = c("s2" = "SSBS")) %>%
-  rename(s2_lu = lu) %>%
+  dplyr::left_join(lus, by = c("s2" = "SSBS")) |>
+  dplyr::rename(s2_lu = lu) |>
   # create an lu_contrast column (what we'll use for modelling)
-  mutate(lu_contrast = paste(s1_lu, s2_lu, sep = "_vs_"))
+  dplyr::mutate(lu_contrast = paste(s1_lu, s2_lu, sep = "_vs_"))
 ```
 
 
@@ -403,11 +416,14 @@ cd_data <- site_comparisons %>%
 In the PREDICTS database, most of the variation in diversity is going to be between Studies -- each study looks at different species groups in different areas using different sampling methods. This has to be accounted for in the statistical analysis. We do this in a mixed effects framework: we treat studies and blocks as random effects.
 
 ## Total Abundance
-Let's start with a simple model of total abundance. Note that the errors in models of ecological abundance are generally non-normal. Usually, we would deal with that by modelling abundance with an error structure, such as poisson or quasipoisson. However, in the PREDICTS database, we take quite a broad view of what counts as an 'abundance' measurement -- they are not all whole individuals so they aren't whole numbers (e.g., they might be expressed as average numbers per square metre). The `lme4` package doesn't really like you using a discrete error structure with continuous data. So instead, we must transform the data. Generally, a log-transformation does well, but in some cases, a square-root transformation helps to normalise the errors. *I'm not going to go through model checking with you here -- this is all just to give you an idea of how to model BII, not how to do statistical analysis... Please check your residual plots etc before using models to make inferences and spatial projections!*
+Let's start with a simple model of total abundance. Note that the errors in models of ecological abundance are generally non-normal. Usually, we would deal with that by modelling abundance with an error structure, such as poisson or quasipoisson. However, in the PREDICTS database, we take quite a broad view of what counts as an 'abundance' measurement -- they are not all whole individuals so they aren't whole numbers (e.g., they might be expressed as average numbers per square metre). The `{lme4}` package doesn't really like you using a discrete error structure with continuous data. So instead, we must transform the data. Generally, a log-transformation does well, but in some cases, a square-root transformation helps to normalise the errors. *We're not going to go through model checking with you here -- this is all just to give you an idea of how to model BII, not how to do statistical analysis... Please check your residual plots etc before using models to make inferences and spatial projections!*
 
 ```{r}
 # run a simple model
-ab_m <- lmer(sqrt(RescaledAbundance) ~ LandUse + (1|SS) + (1|SSB), data = abundance_data)
+ab_m <- lme4::lmer(
+  sqrt(RescaledAbundance) ~ LandUse + (1|SS) + (1|SSB), 
+  data = abundance_data
+)
 summary(ab_m)
 ```
 
@@ -422,21 +438,27 @@ The compositional similarity measure we use is bounded between 0 and 1 -- this m
 
 ```{r}
 # there is some data manipulation we want to do before modelling
-cd_data <- cd_data %>%
+cd_data <- dplyr::mutate(
+  cd_data,
   
   # logit transform the compositional similarity
-  mutate(logitCS = logit(bray, adjust = 0.001, percents = FALSE)) %>%
+  logitCS = car::logit(bray, adjust = 0.001, percents = FALSE),
   
   # log10 transform the geographic distance between sites
-  mutate(log10geo = log10(geog_dist + 1)) %>%
+  log10geo = log10(geog_dist + 1),
   
   # make primary minimal-primary minimal the baseline again
-  mutate(lu_contrast = factor(lu_contrast), 
-         lu_contrast = relevel(lu_contrast, ref = "Primary minimal_vs_Primary minimal"))
+  lu_contrast = factor(lu_contrast), 
+  lu_contrast = relevel(lu_contrast, ref = "Primary minimal_vs_Primary minimal")
+)
+
 
 
 # Model compositional similarity as a function of the land-use contrast and the geographic distance between sites
-cd_m <- lmer(logitCS ~ lu_contrast + log10geo + (1|SS) + (1|s2), data = cd_data)
+cd_m <- lme4::lmer(
+  logitCS ~ lu_contrast + log10geo + (1|SS) + (1|s2), 
+  data = cd_data
+)
 summary(cd_m)
 ```
 
@@ -457,12 +479,12 @@ First of all, let's use the models to predict the abundance and compositional si
 
 # set up a dataframe with all the levels you want to predict diversity for
 # so all the land-use classes in your model must be in here
-newdata_ab <- data.frame(LandUse = levels(abundance_data$LandUse)) %>%
+newdata_ab <- data.frame(LandUse = levels(abundance_data$LandUse)) |>
   
   # now calculate the predicted diversity for each of these land-use levels
   # setting re.form = NA means random effect variance is ignored
   # then square the predictions (because we modelled the square root of abundance, so we have to back-transform it to get the real predicted values)
-  mutate(ab_m_preds = predict(ab_m, ., re.form = NA) ^ 2)
+  dplyr::mutate(ab_m_preds = predict(ab_m, dplyr::across(dplyr::everything()), re.form = NA) ^ 2)
 
 
 # now the compositional similarity model
@@ -477,10 +499,14 @@ inv_logit <- function(f, a){
 # once again, set up the dataframe with all the levels you want to predict diversity for
 # because we had an extra fixed effect in this model (log10geo), we also have to set a baseline level for this
 # We're interested in the compositional similarity when we discount natural turnover, so we want to set this to a static value. We'll use 0 here, but we can also set it to the median geographic distance in the original data or any other meaningful level.
-newdata_cd <- data.frame(lu_contrast = levels(cd_data$lu_contrast),
-                      log10geo = 0) %>%
-  mutate(cd_m_preds = predict(cd_m, ., re.form = NA) %>%
-           inv_logit(a = 0.001))
+newdata_cd <- data.frame(
+  lu_contrast = levels(cd_data$lu_contrast),
+  log10geo = 0
+) |>
+  dplyr::mutate(
+    cd_m_preds = predict(cd_m, dplyr::across(dplyr::everything()), re.form = NA) |>
+      inv_logit(a = 0.001)
+  )
 ```
 
 It's these _predicted_ values (`ab_m_preds` and `cd_m_preds`) that we're going to use. We will multiply the predicted abundance and compositional similarity in each land-use class with the area of the cell in that land-use class. However, because we have a mixed effects model, the _absolute_ values are somewhat meaningless. Instead, we care about the _relative_ values -- what is the abundance or compositional similarity _relative_ to what we'd find if the whole landscape was still minimally-used primary vegetation. So once we have the predictions, we divide by the reference value (the predicted abundance or compositional similarity if the whole cell was minimally-used primary vegetation).
@@ -488,31 +514,32 @@ It's these _predicted_ values (`ab_m_preds` and `cd_m_preds`) that we're going t
 ## Gather land-use rasters
 You can use any land-use data you like, but many land-use maps don't have classes that map easily onto the definitions used by PREDICTS. Notable exceptions are land-use maps developed for the Representative Concentration Pathways (<a href="http://luh.umd.edu/data.shtml#LUH1_Data" target="_blank">LUH1<a/>) -- because PREDICTS land-use classes were designed with these maps in mind -- and the derived fine-resolution product developed by <a href="https://data.csiro.au/dap/landingpage?pid=csiro:15276&v=3&d=true" target="_blank">CSIRO<a/>.
 
-I'm just going to simulate some rasters here for ease.
+We're just going to simulate some rasters here for ease.
 
 We've got seven land-use classes. Imagine we have seven rasters, one for each land-use class, and the cell value is the proportion of the cell assigned to that land-use class. We'll generate some random numbers for each of the land uses -- let's make it mostly cropland, with a fair chunk of pasture and secondary vegetation, with just patches of natural land and urban areas.
 ```{r}
 # generate a dataframe with random numbers for the cell values for each land-use class
-lus <- data.frame(pri_min = rnorm(25, mean = 50, sd = 25),
-                  pri = rnorm(25, mean = 100, sd = 25),
-                  plant = rnorm(25, mean = 100, sd = 25),
-                  sec = rnorm(25, mean = 300, sd = 25),
-                  crop = rnorm(25, mean = 1000, sd = 25),
-                  pas = rnorm(25, mean = 400, sd = 25),
-                  urb = rnorm(25, mean = 50, sd = 25)
-                  )
+lus <- data.frame(
+  pri_min = rnorm(25, mean = 50, sd = 25),
+  pri = rnorm(25, mean = 100, sd = 25),
+  plant = rnorm(25, mean = 100, sd = 25),
+  sec = rnorm(25, mean = 300, sd = 25),
+  crop = rnorm(25, mean = 1000, sd = 25),
+  pas = rnorm(25, mean = 400, sd = 25),
+  urb = rnorm(25, mean = 50, sd = 25)
+)
 
 # let's artificially make the first cell dominated by urban land and the last cell dominated by minimally-used primary vegetation
 lus$urb[1] <- 2000
 lus$pri_min[25] <- 2000
 
-lus <- lus %>%
+lus <- lus |>
   # calculate the row totals
-  mutate(tot = rowSums(.)) %>%
+  dplyr::mutate(tot = rowSums(dplyr::across(dplyr::everything()))) |>
   
   # now, for each land use, divide the value by the rowsum
   # this will give us the proportion of each land use in each cell
-  transmute_at(1:7, list(~ ./tot))
+  dplyr::transmute_at(1:7, list(~ ./tot))
 
 # double check that the proportions of each land use sum to 1 (accounting for rounding errors)
 all(zapsmall(rowSums(lus)) == 1)
@@ -526,14 +553,14 @@ Now turn each land use into its own 5 $\times$ 5 raster.
 for(i in 1:ncol(lus)){
   
   # take the column and turn it into a 5 x 5 matrix
-  ras <- matrix(lus[ , i], nrow = 5, ncol = 5) %>%
+  ras <- matrix(lus[ , i], nrow = 5, ncol = 5) |>
     # turn that into a raster
-    raster()
+    terra::rast()
   
   # come up with a name for the object to hold that raster
   nm <- paste(names(lus)[i], "raster", sep = "_")
   
-  # and assign the raser to that name
+  # and assign the raster to that name
   assign(x = nm, value = ras)
   
 }
@@ -542,7 +569,7 @@ for(i in 1:ncol(lus)){
 For example, here's the raster showing the amount of urban land in each cell:
 ```{r}
 
-plot(urb_raster, col = viridis(20))
+terra::plot(urb_raster, col = viridis::viridis(20))
 
 ```
 
@@ -580,12 +607,12 @@ The final step is to multiply the abundance and compositional similarity rasters
 
 ```{r}
 bii <- ab_raster * cd_raster
-plot(bii * 100, col = viridis(20))
+terra::plot(bii * 100, col = viridis::viridis(20))
 
 ```
 
 
-Once you have your map of BII, you can calculate the average value across any spatial scale. The average BII across this map is `r getValues(bii*100) %>% mean() %>% round(digits = 2)`.
+Once you have your map of BII, you can calculate the average value across any spatial scale. The average BII across this map is `r terra::global(bii*100, "mean") |> round(digits = 2) |> dplyr::pull(mean)`.
 
 And that is it. A quick walkthrough of how we use the PREDICTS database to model and project the Biodiversity Intactness Index.
 
