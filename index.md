@@ -1,9 +1,9 @@
 Calculating the Biodiversity Intactness Index: the PREDICTS
 implementation
 ================
-Adriana De Palma, Katia Sanchez-Ortiz, Helen R.P. Phillips and Andy
-Purvis
-05 February, 2024
+Adriana De Palma, Katia Sanchez-Ortiz, Sara Contu, Helen R.P. Phillips
+and Andy Purvis
+12 February, 2024
 
 -   <a href="#about-predicts" id="toc-about-predicts">About PREDICTS</a>
 -   <a href="#about-bii" id="toc-about-bii">About BII</a>

@@ -1,6 +1,6 @@
 ---
 title: "Calculating the Biodiversity Intactness Index: the PREDICTS implementation"
-author: "Adriana De Palma, Katia Sanchez-Ortiz, Helen R.P. Phillips and Andy Purvis"
+author: "Adriana De Palma, Katia Sanchez-Ortiz, Sara Contu, Helen R.P. Phillips and Andy Purvis"
 date: '`r format(Sys.time(), "%d %B, %Y")`'
 output:
   html_document:
